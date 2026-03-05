@@ -1,6 +1,6 @@
 {
   "name": "clawone",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "ClawOne - One-click OpenClaw Installer",
   "main": "dist-electron/main.js",
   "type": "module",

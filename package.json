@@ -1,7 +1,7 @@
 {
   "name": "clawone",
-  "version": "1.0.0",
-  "description": "ClawOne - One-click OpenClaw Installer", 
+  "version": "1.0.1",
+  "description": "ClawOne - One-click OpenClaw Installer",
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
@@ -11,7 +11,12 @@
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "tsc && vite build && electron-builder"
   },
-  "keywords": ["clawone", "openclaw", "installer", "electron"],
+  "keywords": [
+    "clawone",
+    "openclaw",
+    "installer",
+    "electron"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
@@ -43,14 +48,23 @@
       "dist-electron/**/*"
     ],
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "category": "public.app-category.developer-tools"
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     }
   }
 }

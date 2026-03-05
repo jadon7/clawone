@@ -1,9 +1,13 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import os from 'os';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const execAsync = promisify(exec);
 

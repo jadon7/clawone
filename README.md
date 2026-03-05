@@ -14,6 +14,23 @@ One-click installer for OpenClaw. Built with Electron, React, and TypeScript.
 
 Download the latest release from [Releases](../../releases) and run the installer.
 
+### Platform-Specific Instructions
+
+**Windows:**
+- Download `ClawOne-Setup-{version}.exe` (installer) or `ClawOne-{version}.exe` (portable)
+- Run the installer or portable executable
+- Follow the setup wizard
+
+**macOS:**
+- Download `ClawOne-{version}.dmg` or `ClawOne-{version}-mac.zip`
+- Open the DMG and drag ClawOne to Applications, or extract the ZIP
+- Launch ClawOne from Applications
+
+**Linux:**
+- Download `ClawOne-{version}.AppImage` or `ClawOne_{version}_amd64.deb`
+- For AppImage: `chmod +x ClawOne-{version}.AppImage && ./ClawOne-{version}.AppImage`
+- For DEB: `sudo dpkg -i ClawOne_{version}_amd64.deb`
+
 ## Development
 
 ```bash
@@ -33,6 +50,19 @@ npm run electron:build
 - npm or pnpm or bun
 - Git
 
+### Platform-Specific Requirements
+
+**Windows:**
+- Windows 10 or later (64-bit)
+- Administrator privileges for global npm package installation
+
+**macOS:**
+- macOS 10.13 (High Sierra) or later
+
+**Linux:**
+- Ubuntu 18.04+ / Debian 10+ / Fedora 32+ or equivalent
+- GLIBC 2.28 or later
+
 ## Configuration Steps
 
 1. **AI Provider**: Select your AI model (Anthropic, OpenAI, Ollama, etc.)
@@ -47,6 +77,13 @@ npm run electron:build
 - TypeScript 5+
 - Vite
 - electron-builder
+
+## Platform Support
+
+ClawOne supports the following platforms:
+- ✅ Windows 10+ (64-bit)
+- ✅ macOS 10.13+ (Intel & Apple Silicon)
+- ✅ Linux (Ubuntu 18.04+, Debian 10+, Fedora 32+)
 
 ## Roadmap
 

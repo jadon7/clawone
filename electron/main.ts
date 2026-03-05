@@ -5,11 +5,41 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import os from 'os';
+import { spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const execAsync = promisify(exec);
+
+// Helper function to execute commands in a cross-platform way
+const execCommand = (command: string, args: string[] = []): Promise<{ stdout: string; stderr: string }> => {
+  return new Promise((resolve, reject) => {
+    const isWindows = process.platform === 'win32';
+    const shell = isWindows ? true : false;
+    const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+
+    exec(fullCommand, { shell }, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+};
+
+// Helper function to spawn process with cross-platform support
+const spawnCommand = (command: string, args: string[] = []) => {
+  const isWindows = process.platform === 'win32';
+
+  if (isWindows) {
+    // On Windows, use cmd.exe to execute commands
+    return spawn('cmd.exe', ['/c', command, ...args], { shell: true });
+  } else {
+    return spawn(command, args, { shell: true });
+  }
+};
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -22,7 +52,8 @@ const createWindow = () => {
       contextIsolation: true,
       nodeIntegration: false
     },
-    titleBarStyle: 'hiddenInset',
+    // Use platform-specific title bar style
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
     resizable: true,
     minimizable: true,
     maximizable: true
@@ -55,7 +86,7 @@ app.on('activate', () => {
 // Check Node.js version
 ipcMain.handle('check-node', async () => {
   try {
-    const { stdout } = await execAsync('node --version');
+    const { stdout } = await execCommand('node', ['--version']);
     const version = stdout.trim().replace('v', '');
     const major = parseInt(version.split('.')[0]);
     return { installed: true, version, valid: major >= 22 };
@@ -67,7 +98,7 @@ ipcMain.handle('check-node', async () => {
 // Check package manager
 ipcMain.handle('check-package-manager', async (_, manager: string) => {
   try {
-    const { stdout } = await execAsync(`${manager} --version`);
+    const { stdout } = await execCommand(manager, ['--version']);
     return { installed: true, version: stdout.trim() };
   } catch (error) {
     return { installed: false, version: null };
@@ -77,7 +108,7 @@ ipcMain.handle('check-package-manager', async (_, manager: string) => {
 // Check Git
 ipcMain.handle('check-git', async () => {
   try {
-    const { stdout } = await execAsync('git --version');
+    const { stdout } = await execCommand('git', ['--version']);
     return { installed: true, version: stdout.trim() };
   } catch (error) {
     return { installed: false, version: null };
@@ -87,7 +118,7 @@ ipcMain.handle('check-git', async () => {
 // Install OpenClaw
 ipcMain.handle('install-openclaw', async (event) => {
   return new Promise((resolve, reject) => {
-    const process = exec('npm install -g openclaw@latest');
+    const process = spawnCommand('npm', ['install', '-g', 'openclaw@latest']);
 
     process.stdout?.on('data', (data) => {
       event.sender.send('install-log', data.toString());
@@ -150,7 +181,7 @@ ipcMain.handle('test-api-connection', async (_, provider: string, apiKey: string
 // Start OpenClaw service
 ipcMain.handle('start-openclaw', async (event) => {
   return new Promise((resolve, reject) => {
-    const process = exec('openclaw start');
+    const process = spawnCommand('openclaw', ['start']);
 
     process.stdout?.on('data', (data) => {
       event.sender.send('service-log', data.toString());
@@ -173,7 +204,7 @@ ipcMain.handle('start-openclaw', async (event) => {
 // Stop OpenClaw service
 ipcMain.handle('stop-openclaw', async () => {
   try {
-    await execAsync('openclaw stop');
+    await execCommand('openclaw', ['stop']);
     return { success: true };
   } catch (error) {
     return { success: false, error: (error as Error).message };
@@ -183,7 +214,7 @@ ipcMain.handle('stop-openclaw', async () => {
 // Get service status
 ipcMain.handle('get-service-status', async () => {
   try {
-    const { stdout } = await execAsync('openclaw status');
+    const { stdout } = await execCommand('openclaw', ['status']);
     return { running: stdout.includes('running'), output: stdout };
   } catch (error) {
     return { running: false, output: '' };

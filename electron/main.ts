@@ -52,8 +52,11 @@ const createWindow = () => {
       contextIsolation: true,
       nodeIntegration: false
     },
-    // Use platform-specific title bar style
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
+    // Use platform-specific title bar style with frame enabled for dragging
+    ...(process.platform === 'darwin' ? {
+      titleBarStyle: 'hiddenInset',
+      frame: true
+    } : {}),
     resizable: true,
     minimizable: true,
     maximizable: true

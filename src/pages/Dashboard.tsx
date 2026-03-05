@@ -53,7 +53,7 @@ export default function Dashboard({ config }: DashboardProps) {
 
   return (
     <div className="page">
-      <h1>OpenClaw Dashboard</h1>
+      <h1>ClawOne Dashboard</h1>
       <p>Your OpenClaw installation is complete and ready to use!</p>
 
       <div className="dashboard-grid">

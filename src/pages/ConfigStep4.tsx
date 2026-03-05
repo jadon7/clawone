@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { OpenClawConfig } from '../types';
 
 interface ConfigStep4Props {
@@ -9,6 +10,7 @@ interface ConfigStep4Props {
 }
 
 export default function ConfigStep4({ config, updateConfig, onNext, onBack }: ConfigStep4Props) {
+  const { t } = useTranslation();
   const [channels, setChannels] = useState(config.channels || {});
   const [saving, setSaving] = useState(false);
 
@@ -56,8 +58,8 @@ export default function ConfigStep4({ config, updateConfig, onNext, onBack }: Co
         <div className="step-dot active"></div>
       </div>
 
-      <h1>Configuration - Step 4</h1>
-      <p>Select messaging channels (optional)</p>
+      <h1>{t('config.step4.title')}</h1>
+      <p>{t('config.step4.description')}</p>
 
       <div className="checkbox-group" style={{ marginBottom: '24px' }}>
         {channelOptions.map((channel) => (
@@ -81,23 +83,22 @@ export default function ConfigStep4({ config, updateConfig, onNext, onBack }: Co
           marginBottom: '24px'
         }}
       >
-        <strong style={{ color: '#7c2d12' }}>Optional Configuration</strong>
+        <strong style={{ color: '#7c2d12' }}>{t('config.step4.optionalConfig')}</strong>
         <p style={{ color: '#744210', marginTop: '8px', marginBottom: '0' }}>
-          You can skip this step and configure messaging channels later. Each
-          channel will require additional setup in the configuration file.
+          {t('config.step4.optionalInfo')}
         </p>
       </div>
 
       <div className="button-group">
         <button className="button button-secondary" onClick={onBack}>
-          Back
+          {t('config.step4.back')}
         </button>
         <button
           className="button"
           onClick={handleFinish}
           disabled={saving}
         >
-          {saving ? 'Saving...' : 'Finish Setup'}
+          {saving ? t('config.step4.saving') : t('config.step4.finish')}
         </button>
       </div>
     </div>

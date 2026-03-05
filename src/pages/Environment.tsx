@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface EnvironmentProps {
   onNext: () => void;
@@ -11,6 +12,7 @@ interface CheckResult {
 }
 
 export default function Environment({ onNext }: EnvironmentProps) {
+  const { t } = useTranslation();
   const [nodeCheck, setNodeCheck] = useState<CheckResult | null>(null);
   const [npmCheck, setNpmCheck] = useState<CheckResult | null>(null);
   const [gitCheck, setGitCheck] = useState<CheckResult | null>(null);
@@ -54,7 +56,7 @@ export default function Environment({ onNext }: EnvironmentProps) {
           <div className="check-item-info">
             <div className="check-item-name">{name}</div>
           </div>
-          <span className="status-badge status-warning">Checking...</span>
+          <span className="status-badge status-warning">{t('environment.checking')}</span>
         </div>
       );
     }
@@ -78,9 +80,9 @@ export default function Environment({ onNext }: EnvironmentProps) {
         <span className={`status-badge status-${status}`}>
           {check.installed
             ? check.valid !== false
-              ? '✓ Installed'
-              : '⚠ Version too old'
-            : '✗ Not found'}
+              ? t('environment.installed')
+              : t('environment.versionTooOld')
+            : t('environment.notFound')}
         </span>
       </div>
     );
@@ -88,10 +90,9 @@ export default function Environment({ onNext }: EnvironmentProps) {
 
   return (
     <div className="page">
-      <h1>Environment Check</h1>
+      <h1>{t('environment.title')}</h1>
       <p>
-        Checking your system for required dependencies. Please ensure all items
-        are installed before continuing.
+        {t('environment.description')}
       </p>
 
       <div style={{ marginBottom: '32px' }}>
@@ -110,12 +111,12 @@ export default function Environment({ onNext }: EnvironmentProps) {
             marginBottom: '24px'
           }}
         >
-          <strong style={{ color: '#c53030' }}>Installation Required</strong>
+          <strong style={{ color: '#c53030' }}>{t('environment.installationRequired')}</strong>
           <p style={{ color: '#742a2a', marginTop: '8px', marginBottom: '0' }}>
-            Please install the missing dependencies:
+            {t('environment.pleaseInstall')}
             <br />
             {!nodeCheck?.installed && '• Node.js: https://nodejs.org/'}
-            {nodeCheck?.installed && !nodeCheck?.valid && '• Node.js ≥22 required'}
+            {nodeCheck?.installed && !nodeCheck?.valid && `• ${t('environment.nodeRequired')}`}
             <br />
             {!gitCheck?.installed && '• Git: https://git-scm.com/'}
           </p>
@@ -124,14 +125,14 @@ export default function Environment({ onNext }: EnvironmentProps) {
 
       <div className="button-group">
         <button className="button button-secondary" onClick={checkEnvironment}>
-          Recheck
+          {t('environment.recheck')}
         </button>
         <button
           className="button"
           onClick={onNext}
           disabled={!allChecksPass()}
         >
-          Continue
+          {t('environment.continue')}
         </button>
       </div>
     </div>

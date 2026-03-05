@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Page, OpenClawConfig } from './types';
 import Welcome from './pages/Welcome';
 import Environment from './pages/Environment';
@@ -11,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import './App.css';
 
 function App() {
+  const { i18n } = useTranslation();
   const [currentPage, setCurrentPage] = useState<Page>('welcome');
   const [config, setConfig] = useState<Partial<OpenClawConfig>>({
     workspace: '~/.openclaw/workspace'
@@ -18,6 +20,12 @@ function App() {
 
   const updateConfig = (updates: Partial<OpenClawConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }));
+  };
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'zh' : 'en';
+    i18n.changeLanguage(newLang);
+    localStorage.setItem('language', newLang);
   };
 
   const renderPage = () => {
@@ -72,6 +80,25 @@ function App() {
 
   return (
     <div className="app">
+      <button
+        onClick={toggleLanguage}
+        style={{
+          position: 'fixed',
+          top: '16px',
+          right: '16px',
+          padding: '8px 16px',
+          background: '#4299e1',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          fontSize: '14px',
+          fontWeight: '500',
+          zIndex: 1000
+        }}
+      >
+        {i18n.language === 'en' ? '中文' : 'English'}
+      </button>
       {renderPage()}
     </div>
   );

@@ -1,0 +1,103 @@
+{
+  "welcome": {
+    "title": "ClawOne",
+    "subtitle": "One-Click OpenClaw Installer",
+    "description": "Welcome to ClawOne. This wizard will guide you through setting up your AI-powered automation platform.",
+    "getStarted": "Get Started"
+  },
+  "environment": {
+    "title": "Environment Check",
+    "description": "Checking your system for required dependencies. Please ensure all items are installed before continuing.",
+    "checking": "Checking...",
+    "installed": "✓ Installed",
+    "versionTooOld": "⚠ Version too old",
+    "notFound": "✗ Not found",
+    "installationRequired": "Installation Required",
+    "pleaseInstall": "Please install the missing dependencies:",
+    "nodeRequired": "• Node.js ≥22 required",
+    "recheck": "Recheck",
+    "continue": "Continue"
+  },
+  "install": {
+    "title": "Install OpenClaw",
+    "description": "Click the button below to install OpenClaw globally on your system. This may take a few minutes.",
+    "installButton": "Install OpenClaw",
+    "starting": "Starting OpenClaw installation...",
+    "completed": "Installation completed successfully!",
+    "failed": "Installation Failed",
+    "continueToConfig": "Continue to Configuration",
+    "retry": "Retry Installation"
+  },
+  "config": {
+    "step1": {
+      "title": "Configuration - Step 1",
+      "description": "Select your AI model provider",
+      "aiProvider": "AI Provider",
+      "selectProvider": "Select a provider...",
+      "localModel": "Local Model",
+      "ollamaInfo": "Ollama runs models locally on your machine. Make sure you have Ollama installed and running.",
+      "next": "Next"
+    },
+    "step2": {
+      "title": "Configuration - Step 2",
+      "description": "Enter your API credentials",
+      "apiKeyFor": "API Key for",
+      "enterApiKey": "Enter your API key...",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "connectionSuccess": "✓ Connection Successful",
+      "connectionFailed": "✗ Connection Failed",
+      "noApiKeyRequired": "No API Key Required",
+      "ollamaNoKey": "Ollama runs locally and doesn't require an API key.",
+      "back": "Back",
+      "next": "Next"
+    },
+    "step3": {
+      "title": "Configuration - Step 3",
+      "description": "Configure your workspace directory",
+      "workspacePath": "Workspace Path",
+      "workspaceInfo": "This is where OpenClaw will store its data and logs.",
+      "defaultLocation": "Default Location",
+      "defaultInfo": "The default workspace location is recommended for most users. You can change this later in the configuration file.",
+      "back": "Back",
+      "next": "Next"
+    },
+    "step4": {
+      "title": "Configuration - Step 4",
+      "description": "Select messaging channels (optional)",
+      "optionalConfig": "Optional Configuration",
+      "optionalInfo": "You can skip this step and configure messaging channels later. Each channel will require additional setup in the configuration file.",
+      "back": "Back",
+      "finish": "Finish Setup",
+      "saving": "Saving..."
+    }
+  },
+  "dashboard": {
+    "title": "ClawOne Dashboard",
+    "description": "Your OpenClaw installation is complete and ready to use!",
+    "serviceStatus": "Service Status",
+    "running": "Running",
+    "stopped": "Stopped",
+    "startService": "Start Service",
+    "stopService": "Stop Service",
+    "refresh": "Refresh",
+    "configuration": "Configuration",
+    "provider": "Provider",
+    "workspace": "Workspace",
+    "channels": "Channels",
+    "none": "None",
+    "serviceLogs": "Service Logs",
+    "noLogs": "No logs yet...",
+    "setupComplete": "✓ Setup Complete!",
+    "setupCompleteInfo": "OpenClaw is now installed and configured. You can start the service above or run",
+    "fromTerminal": "from your terminal.",
+    "starting": "Starting OpenClaw service...",
+    "startSuccess": "Service started successfully!",
+    "stopSuccess": "Service stopped."
+  },
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "chinese": "中文"
+  }
+}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { OpenClawConfig } from '../types';
 
 interface ConfigStep2Props {
@@ -9,6 +10,7 @@ interface ConfigStep2Props {
 }
 
 export default function ConfigStep2({ config, updateConfig, onNext, onBack }: ConfigStep2Props) {
+  const { t } = useTranslation();
   const [apiKey, setApiKey] = useState(config.ai?.apiKey || '');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -66,21 +68,21 @@ export default function ConfigStep2({ config, updateConfig, onNext, onBack }: Co
         <div className="step-dot"></div>
       </div>
 
-      <h1>Configuration - Step 2</h1>
-      <p>Enter your API credentials</p>
+      <h1>{t('config.step2.title')}</h1>
+      <p>{t('config.step2.description')}</p>
 
       {needsApiKey ? (
         <>
           <div className="form-group">
             <label className="form-label">
-              API Key for {config.ai?.provider}
+              {t('config.step2.apiKeyFor')} {config.ai?.provider}
             </label>
             <input
               type="password"
               className="form-input"
               value={apiKey}
               onChange={(e) => handleApiKeyChange(e.target.value)}
-              placeholder="Enter your API key..."
+              placeholder={t('config.step2.enterApiKey')}
             />
           </div>
 
@@ -90,7 +92,7 @@ export default function ConfigStep2({ config, updateConfig, onNext, onBack }: Co
             disabled={!apiKey || testing}
             style={{ marginBottom: '24px' }}
           >
-            {testing ? 'Testing...' : 'Test Connection'}
+            {testing ? t('config.step2.testing') : t('config.step2.testConnection')}
           </button>
 
           {testResult && (
@@ -104,7 +106,7 @@ export default function ConfigStep2({ config, updateConfig, onNext, onBack }: Co
               }}
             >
               <strong style={{ color: testResult.success ? '#22543d' : '#c53030' }}>
-                {testResult.success ? '✓ Connection Successful' : '✗ Connection Failed'}
+                {testResult.success ? t('config.step2.connectionSuccess') : t('config.step2.connectionFailed')}
               </strong>
               <p style={{ marginTop: '8px', marginBottom: '0' }}>
                 {testResult.message}
@@ -122,23 +124,23 @@ export default function ConfigStep2({ config, updateConfig, onNext, onBack }: Co
             marginBottom: '24px'
           }}
         >
-          <strong style={{ color: '#2c5282' }}>No API Key Required</strong>
+          <strong style={{ color: '#2c5282' }}>{t('config.step2.noApiKeyRequired')}</strong>
           <p style={{ color: '#2d3748', marginTop: '8px', marginBottom: '0' }}>
-            Ollama runs locally and doesn't require an API key.
+            {t('config.step2.ollamaNoKey')}
           </p>
         </div>
       )}
 
       <div className="button-group">
         <button className="button button-secondary" onClick={onBack}>
-          Back
+          {t('config.step2.back')}
         </button>
         <button
           className="button"
           onClick={handleNext}
           disabled={!canContinue()}
         >
-          Next
+          {t('config.step2.next')}
         </button>
       </div>
     </div>

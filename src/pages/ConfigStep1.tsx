@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { OpenClawConfig } from '../types';
 
 interface ConfigStep1Props {
@@ -7,6 +8,7 @@ interface ConfigStep1Props {
 }
 
 export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep1Props) {
+  const { t } = useTranslation();
   const providers = [
     { value: 'anthropic', label: 'Anthropic Claude' },
     { value: 'openai', label: 'OpenAI' },
@@ -38,17 +40,17 @@ export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep
         <div className="step-dot"></div>
       </div>
 
-      <h1>Configuration - Step 1</h1>
-      <p>Select your AI model provider</p>
+      <h1>{t('config.step1.title')}</h1>
+      <p>{t('config.step1.description')}</p>
 
       <div className="form-group">
-        <label className="form-label">AI Provider</label>
+        <label className="form-label">{t('config.step1.aiProvider')}</label>
         <select
           className="form-select"
           value={config.ai?.provider || ''}
           onChange={(e) => handleProviderChange(e.target.value)}
         >
-          <option value="">Select a provider...</option>
+          <option value="">{t('config.step1.selectProvider')}</option>
           {providers.map((provider) => (
             <option key={provider.value} value={provider.value}>
               {provider.label}
@@ -67,10 +69,9 @@ export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep
             marginBottom: '24px'
           }}
         >
-          <strong style={{ color: '#2c5282' }}>Local Model</strong>
+          <strong style={{ color: '#2c5282' }}>{t('config.step1.localModel')}</strong>
           <p style={{ color: '#2d3748', marginTop: '8px', marginBottom: '0' }}>
-            Ollama runs models locally on your machine. Make sure you have Ollama
-            installed and running.
+            {t('config.step1.ollamaInfo')}
           </p>
         </div>
       )}
@@ -81,7 +82,7 @@ export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep
           onClick={onNext}
           disabled={!canContinue()}
         >
-          Next
+          {t('config.step1.next')}
         </button>
       </div>
     </div>

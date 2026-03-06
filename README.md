@@ -10,6 +10,8 @@ One-click installer for OpenClaw. Built with Electron, React, and TypeScript.
 - 🎛️ Service management dashboard
 - 📜 Real-time installation logs
 - 🔄 Auto-update functionality (GitHub Releases)
+- 🔌 Plugin management system
+- 🌐 Multi-language support (English & Chinese)
 
 ## Quick Start
 
@@ -105,6 +107,41 @@ npm run publish
 export GH_TOKEN=your_github_token
 npm run publish
 ```
+
+## Plugin Management
+
+ClawOne includes a powerful plugin management system:
+
+- **Plugin Marketplace**: Browse and install plugins from the Plugin Manager
+- **Categories**: Messaging, Integration, and Utility plugins
+- **One-Click Install**: Install plugins via npm with a single click
+- **Enable/Disable**: Toggle plugins without uninstalling
+- **Configuration Storage**: Plugin settings stored in localStorage
+
+### Available Plugins
+
+**Messaging:**
+- WhatsApp - Connect to WhatsApp for messaging automation
+- Telegram - Integrate with Telegram Bot API
+- Discord - Connect to Discord servers and channels
+- Slack - Integrate with Slack workspaces
+- Email - Send and receive emails
+
+**Integration:**
+- GitHub - Automate GitHub workflows and issues
+
+**Utility:**
+- Scheduler - Schedule tasks and reminders
+- Web Scraper - Extract data from websites
+
+### Managing Plugins
+
+1. Open ClawOne Dashboard
+2. Click "🔌 Plugin Manager"
+3. Browse plugins by category
+4. Click "Install" to add a plugin
+5. Toggle the checkbox to enable/disable
+6. Click "Uninstall" to remove a plugin
 
 ## Platform Support
 

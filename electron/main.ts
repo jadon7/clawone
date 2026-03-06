@@ -13,19 +13,39 @@ const __dirname = path.dirname(__filename);
 
 const execAsync = promisify(exec);
 
+// Get the user's login shell PATH (important for nvm, homebrew, etc.)
+const getShellEnv = (): NodeJS.ProcessEnv => {
+  const env = { ...process.env };
+  // Ensure common tool paths are included on macOS/Linux
+  if (process.platform !== 'win32') {
+    const extraPaths = [
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin',
+      '/opt/homebrew/bin',       // Apple Silicon Homebrew
+      '/usr/local/homebrew/bin', // Intel Homebrew
+      `${process.env.HOME}/.nvm/versions/node/current/bin`,
+      `${process.env.HOME}/.volta/bin`,
+      `${process.env.HOME}/.fnm/current/bin`,
+    ].filter(Boolean);
+
+    const currentPath = env.PATH || '';
+    const pathSet = new Set([...currentPath.split(':'), ...extraPaths]);
+    env.PATH = Array.from(pathSet).join(':');
+  }
+  return env;
+};
+
 // Helper function to execute commands in a cross-platform way with timeout
 const execCommand = (command: string, args: string[] = [], timeoutMs: number = 10000): Promise<{ stdout: string; stderr: string }> => {
   return new Promise((resolve, reject) => {
-    const isWindows = process.platform === 'win32';
-    const shell = isWindows ? true : false;
+    // Always use shell:true so PATH is resolved correctly on all platforms
     const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+    const env = getShellEnv();
 
-    const child = exec(fullCommand, { shell, timeout: timeoutMs }, (error, stdout, stderr) => {
+    const child = exec(fullCommand, { shell: true, timeout: timeoutMs, env }, (error, stdout, stderr) => {
       if (error) {
-        // Don't reject on command not found, just return empty result
-        if (error.code === 'ENOENT' || error.message.includes('not found')) {
-          reject(error);
-        } else if (error.killed) {
+        if (error.killed) {
           reject(new Error('Command timeout'));
         } else {
           reject(error);
@@ -157,8 +177,10 @@ ipcMain.handle('check-node', async () => {
     const { stdout } = await execCommand('node', ['--version']);
     const version = stdout.trim().replace('v', '');
     const major = parseInt(version.split('.')[0]);
+    console.log('[check-node] version:', version, 'valid:', major >= 22);
     return { installed: true, version, valid: major >= 22 };
   } catch (error) {
+    console.error('[check-node] failed:', (error as Error).message);
     return { installed: false, version: null, valid: false };
   }
 });
@@ -167,8 +189,11 @@ ipcMain.handle('check-node', async () => {
 ipcMain.handle('check-package-manager', async (_, manager: string) => {
   try {
     const { stdout } = await execCommand(manager, ['--version']);
-    return { installed: true, version: stdout.trim() };
+    const version = stdout.trim();
+    console.log(`[check-${manager}] version:`, version);
+    return { installed: true, version };
   } catch (error) {
+    console.error(`[check-${manager}] failed:`, (error as Error).message);
     return { installed: false, version: null };
   }
 });
@@ -177,8 +202,11 @@ ipcMain.handle('check-package-manager', async (_, manager: string) => {
 ipcMain.handle('check-git', async () => {
   try {
     const { stdout } = await execCommand('git', ['--version']);
-    return { installed: true, version: stdout.trim() };
+    const version = stdout.trim();
+    console.log('[check-git] version:', version);
+    return { installed: true, version };
   } catch (error) {
+    console.error('[check-git] failed:', (error as Error).message);
     return { installed: false, version: null };
   }
 });

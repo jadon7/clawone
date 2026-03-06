@@ -23,18 +23,6 @@ export default function Environment({ onNext }: EnvironmentProps) {
     checkEnvironment();
   }, []);
 
-  const checkWithTimeout = async <T,>(
-    promise: Promise<T>,
-    timeoutMs: number = 10000
-  ): Promise<T> => {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), timeoutMs)
-      )
-    ]);
-  };
-
   const checkEnvironment = async () => {
     setChecking(true);
     setError(null);
@@ -42,40 +30,37 @@ export default function Environment({ onNext }: EnvironmentProps) {
     setNpmCheck(null);
     setGitCheck(null);
 
+    // Check Node.js
     try {
-      // Check Node.js with timeout
-      try {
-        const node = await checkWithTimeout(window.electronAPI.checkNode(), 10000);
-        setNodeCheck(node);
-      } catch (err) {
-        console.error('Node check failed:', err);
-        setNodeCheck({ installed: false, version: null, valid: false });
-      }
-
-      // Check npm with timeout
-      try {
-        const npm = await checkWithTimeout(window.electronAPI.checkPackageManager('npm'), 10000);
-        setNpmCheck(npm);
-      } catch (err) {
-        console.error('npm check failed:', err);
-        setNpmCheck({ installed: false, version: null });
-      }
-
-      // Check Git with timeout
-      try {
-        const git = await checkWithTimeout(window.electronAPI.checkGit(), 10000);
-        setGitCheck(git);
-      } catch (err) {
-        console.error('Git check failed:', err);
-        setGitCheck({ installed: false, version: null });
-      }
-
-      setChecking(false);
+      const node = await window.electronAPI.checkNode();
+      console.log('[Environment] node result:', node);
+      setNodeCheck(node);
     } catch (err) {
-      console.error('Environment check failed:', err);
-      setError((err as Error).message || 'Unknown error occurred');
-      setChecking(false);
+      console.error('[Environment] node check failed:', err);
+      setNodeCheck({ installed: false, version: null, valid: false });
     }
+
+    // Check npm
+    try {
+      const npm = await window.electronAPI.checkPackageManager('npm');
+      console.log('[Environment] npm result:', npm);
+      setNpmCheck(npm);
+    } catch (err) {
+      console.error('[Environment] npm check failed:', err);
+      setNpmCheck({ installed: false, version: null });
+    }
+
+    // Check Git
+    try {
+      const git = await window.electronAPI.checkGit();
+      console.log('[Environment] git result:', git);
+      setGitCheck(git);
+    } catch (err) {
+      console.error('[Environment] git check failed:', err);
+      setGitCheck({ installed: false, version: null });
+    }
+
+    setChecking(false);
   };
 
   const allChecksPass = () => {

@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import os from 'os';
 import { spawn } from 'child_process';
+import { autoUpdater } from 'electron-updater';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,7 +71,54 @@ const createWindow = () => {
   }
 };
 
-app.whenReady().then(createWindow);
+// Auto-updater configuration
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+// Configure update server (GitHub Releases)
+if (process.env.NODE_ENV === 'production') {
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'jadon7',
+    repo: 'clawone'
+  });
+}
+
+// Auto-updater event handlers
+autoUpdater.on('checking-for-update', () => {
+  mainWindow?.webContents.send('update-checking');
+});
+
+autoUpdater.on('update-available', (info) => {
+  mainWindow?.webContents.send('update-available', info);
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  mainWindow?.webContents.send('update-not-available', info);
+});
+
+autoUpdater.on('error', (err) => {
+  mainWindow?.webContents.send('update-error', err.message);
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  mainWindow?.webContents.send('update-download-progress', progressObj);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  mainWindow?.webContents.send('update-downloaded', info);
+});
+
+app.whenReady().then(() => {
+  createWindow();
+
+  // Check for updates after app is ready (only in production)
+  if (!process.env.VITE_DEV_SERVER_URL) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates();
+    }, 3000);
+  }
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -222,4 +270,27 @@ ipcMain.handle('get-service-status', async () => {
   } catch (error) {
     return { running: false, output: '' };
   }
+});
+
+// Auto-updater IPC handlers
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { success: true, updateInfo: result?.updateInfo };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall(false, true);
 });

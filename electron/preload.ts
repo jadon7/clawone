@@ -24,5 +24,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getServiceStatus: () => ipcRenderer.invoke('get-service-status'),
   onServiceLog: (callback: (log: string) => void) => {
     ipcRenderer.on('service-log', (_, log) => callback(log));
+  },
+
+  // Auto-updater
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateChecking: (callback: () => void) => {
+    ipcRenderer.on('update-checking', () => callback());
+  },
+  onUpdateAvailable: (callback: (info: any) => void) => {
+    ipcRenderer.on('update-available', (_, info) => callback(info));
+  },
+  onUpdateNotAvailable: (callback: (info: any) => void) => {
+    ipcRenderer.on('update-not-available', (_, info) => callback(info));
+  },
+  onUpdateError: (callback: (error: string) => void) => {
+    ipcRenderer.on('update-error', (_, error) => callback(error));
+  },
+  onUpdateDownloadProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('update-download-progress', (_, progress) => callback(progress));
+  },
+  onUpdateDownloaded: (callback: (info: any) => void) => {
+    ipcRenderer.on('update-downloaded', (_, info) => callback(info));
   }
 });

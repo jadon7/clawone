@@ -11,6 +11,15 @@ export interface ElectronAPI {
   stopOpenClaw: () => Promise<{ success: boolean; error?: string }>;
   getServiceStatus: () => Promise<{ running: boolean; output: string }>;
   onServiceLog: (callback: (log: string) => void) => void;
+  checkForUpdates: () => Promise<{ success: boolean; updateInfo?: any; error?: string }>;
+  downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
+  installUpdate: () => void;
+  onUpdateChecking: (callback: () => void) => void;
+  onUpdateAvailable: (callback: (info: any) => void) => void;
+  onUpdateNotAvailable: (callback: (info: any) => void) => void;
+  onUpdateError: (callback: (error: string) => void) => void;
+  onUpdateDownloadProgress: (callback: (progress: any) => void) => void;
+  onUpdateDownloaded: (callback: (info: any) => void) => void;
 }
 
 declare global {

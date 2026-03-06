@@ -9,6 +9,7 @@ One-click installer for OpenClaw. Built with Electron, React, and TypeScript.
 - 🧙 Configuration wizard with 4 steps
 - 🎛️ Service management dashboard
 - 📜 Real-time installation logs
+- 🔄 Auto-update functionality (GitHub Releases)
 
 ## Quick Start
 
@@ -77,6 +78,33 @@ npm run electron:build
 - TypeScript 5+
 - Vite
 - electron-builder
+- electron-updater
+
+## Auto-Update
+
+ClawOne includes automatic update functionality powered by electron-updater:
+
+- **Automatic checks**: The app checks for updates on startup
+- **Manual checks**: Click "Check for Updates" in the Dashboard
+- **Download control**: Updates are downloaded only when you approve
+- **Install control**: Choose when to restart and install updates
+- **GitHub Releases**: Updates are distributed via GitHub Releases
+
+### For Developers
+
+To publish a new release with auto-update support:
+
+```bash
+# 1. Update version in package.json
+npm version patch  # or minor, major
+
+# 2. Build and publish to GitHub Releases
+npm run publish
+
+# Note: Requires GH_TOKEN environment variable with repo access
+export GH_TOKEN=your_github_token
+npm run publish
+```
 
 ## Platform Support
 

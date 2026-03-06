@@ -1,7 +1,7 @@
 export interface ElectronAPI {
-  checkNode: () => Promise<{ installed: boolean; version: string | null; valid: boolean }>;
-  checkPackageManager: (manager: string) => Promise<{ installed: boolean; version: string | null }>;
-  checkGit: () => Promise<{ installed: boolean; version: string | null }>;
+  checkNode: () => Promise<{ installed: boolean; version: string | null; valid: boolean; debug?: string }>;
+  checkPackageManager: (manager: string) => Promise<{ installed: boolean; version: string | null; debug?: string }>;
+  checkGit: () => Promise<{ installed: boolean; version: string | null; debug?: string }>;
   installOpenClaw: () => Promise<{ success: boolean }>;
   onInstallLog: (callback: (log: string) => void) => void;
   readConfig: () => Promise<OpenClawConfig | null>;

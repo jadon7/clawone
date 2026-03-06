@@ -1,0 +1,223 @@
+ClawOne 项目状态报告
+===================
+
+项目概述
+--------
+ClawOne 是一个基于 Electron + React + TypeScript 的 OpenClaw 一键安装器。
+当前版本：1.0.2
+最近提交：refactor: #3 optimize Chinese language support
+
+技术栈
+------
+- Electron 28+
+- React 18+
+- TypeScript 5+
+- Vite 5
+- electron-builder
+- i18next + react-i18next (国际化)
+
+项目结构
+--------
+/electron
+  - main.ts: Electron 主进程，处理 IPC 通信和系统调用
+  - preload.ts: 预加载脚本，暴露安全的 API 给渲染进程
+
+/src
+  - App.tsx: 主应用组件，管理页面路由和配置状态
+  - types.ts: TypeScript 类型定义
+  - App.css: 全局样式
+  - main.tsx: React 入口文件
+
+/src/i18n
+  - index.ts: i18n 配置和初始化
+  - en.json: 英文翻译
+  - zh.json: 中文翻译
+
+/src/pages
+  - Welcome.tsx: 欢迎页面
+  - Environment.tsx: 环境检测页面（Node.js ≥22, npm, Git）
+  - Install.tsx: OpenClaw 安装页面
+  - ConfigStep1.tsx: 配置步骤1 - AI Provider 选择
+  - ConfigStep2.tsx: 配置步骤2 - API Key 输入
+  - ConfigStep3.tsx: 配置步骤3 - Workspace 配置
+  - ConfigStep4.tsx: 配置步骤4 - Channels 选择
+  - Dashboard.tsx: 服务管理仪表板
+
+核心功能
+--------
+1. 环境检测
+   - 检测 Node.js 版本（要求 ≥22）
+   - 检测 npm 安装状态
+   - 检测 Git 安装状态
+
+2. 一键安装
+   - 执行 npm install -g openclaw@latest
+   - 实时显示安装日志
+
+3. 配置向导（4步）
+   - AI Provider 选择（Anthropic, OpenAI, Ollama 等）
+   - API Key 配置和连接测试
+   - Workspace 目录配置
+   - 消息通道选择（WhatsApp, Telegram, Discord, Slack）
+
+4. 服务管理
+   - 启动/停止 OpenClaw 服务
+   - 实时服务状态监控
+   - 服务日志查看
+   - 配置信息展示
+
+5. 国际化支持
+   - 中英文双语界面
+   - 自动检测系统语言
+   - 手动切换语言（右上角按钮，带动画效果）
+   - 语言偏好持久化存储
+   - 所有文本完全翻译，无硬编码
+   - 专业术语准确翻译
+
+IPC 通信接口
+-----------
+- check-node: 检查 Node.js 版本
+- check-package-manager: 检查包管理器
+- check-git: 检查 Git
+- install-openclaw: 安装 OpenClaw
+- read-config: 读取配置文件 (~/.openclaw/openclaw.json)
+- write-config: 写入配置文件
+- test-api-connection: 测试 API 连接
+- start-openclaw: 启动服务
+- stop-openclaw: 停止服务
+- get-service-status: 获取服务状态
+
+跨平台支持
+----------
+✅ Windows 10+ (64-bit)
+   - NSIS 安装器
+   - 便携版 (portable)
+   - 使用 cmd.exe 执行命令
+   - 标准窗口标题栏
+
+✅ macOS 10.13+ (Intel & Apple Silicon)
+   - DMG 安装包
+   - ZIP 压缩包
+   - hiddenInset 标题栏样式 + frame: true（支持窗口拖动）
+
+✅ Linux (Ubuntu 18.04+, Debian 10+, Fedora 32+)
+   - AppImage
+   - DEB 包
+
+跨平台实现细节
+--------------
+- execCommand(): 跨平台命令执行（自动处理 Windows shell）
+- spawnCommand(): 跨平台进程生成（Windows 使用 cmd.exe）
+- 平台检测：process.platform === 'win32'
+- 路径处理：使用 path.join() 和 os.homedir()
+- 标题栏样式：macOS 使用 hiddenInset，其他平台使用默认
+
+构建配置
+--------
+- 开发模式: npm run electron:dev
+- 生产构建: npm run electron:build
+- 输出目录: release/
+- 支持平台: macOS (dmg/zip), Windows (nsis/portable), Linux (AppImage/deb)
+
+已完成功能
+----------
+✅ MVP 阶段完成
+✅ 基础功能实现
+✅ 环境检测
+✅ 安装流程
+✅ 配置向导
+✅ 服务管理
+✅ Git 仓库已初始化
+✅ 代码库干净（无未提交更改）
+✅ Issue #1: 修复 ES Module 下 __dirname 未定义错误
+✅ Issue #2: Windows 平台支持
+   - 跨平台命令执行
+   - 平台特定 UI 配置
+   - Windows 使用说明
+   - 构建配置验证
+✅ Issue #4: 修复窗口无法拖动问题
+   - 添加 frame: true 到 macOS 窗口配置
+   - 确保 hiddenInset 标题栏样式下窗口可拖动
+   - 测试验证通过
+✅ Issue #3: 中文语言支持
+   - 安装 i18next 和 react-i18next
+   - 创建完整的中英文翻译文件
+   - 实现语言自动检测和手动切换
+   - 所有页面和组件完成国际化
+   - 语言偏好持久化到 localStorage
+   - 优化翻译质量，移除所有硬编码文本
+   - 添加语言切换按钮动画和过渡效果
+   - 改进按钮样式（地球图标、毛玻璃效果）
+   - 添加页面切换淡入动画
+
+最近更新 (Issue #3 优化)
+-----------------------
+进一步优化国际化支持：
+- 完善翻译：将所有硬编码文本移至翻译文件
+  * 环境检测项目名称（Node.js, npm, Git）
+  * AI 提供商名称（Anthropic, OpenAI, Ollama 等）
+  * 消息通道名称（WhatsApp, Telegram, Discord, Slack）
+- 优化中文翻译质量，使用更专业准确的术语
+- 改进语言切换按钮：
+  * 添加地球图标 🌐 提升视觉识别
+  * 毛玻璃效果（backdrop-filter）
+  * 悬停动画和旋转效果
+  * 优化样式和阴影
+- 添加页面过渡动画（淡入效果）
+- 提交：a895c3e
+
+历史更新 (Issue #3)
+-------------------
+实现完整的国际化支持：
+- 依赖：安装 i18next@25.8.14 和 react-i18next@16.5.4
+- 翻译文件：创建 src/i18n/en.json 和 zh.json
+- 自动检测：根据 navigator.language 自动选择语言
+- 手动切换：右上角语言切换按钮（中文 ⇄ English）
+- 持久化：用户选择保存到 localStorage
+- 全面翻译：所有 8 个页面组件完成国际化
+- 提交：d63afa9
+
+历史更新 (Issue #4)
+-------------------
+修复 macOS 窗口无法拖动问题：
+- 问题：使用 titleBarStyle: 'hiddenInset' 但缺少 frame 选项
+- 解决：在 electron/main.ts 的 createWindow 函数中添加 frame: true
+- 影响：macOS 用户现在可以正常拖动应用窗口
+- 提交：195a83b
+
+历史更新 (Issue #2)
+-------------------
+1. 添加跨平台命令执行辅助函数
+   - execCommand(): 处理简单命令执行
+   - spawnCommand(): 处理需要实时输出的进程
+
+2. 更新所有 IPC 处理器使用跨平台命令
+   - check-node
+   - check-package-manager
+   - check-git
+   - install-openclaw
+   - start-openclaw
+   - stop-openclaw
+   - get-service-status
+
+3. 平台特定 UI 配置
+   - macOS: hiddenInset 标题栏
+   - Windows/Linux: 默认标题栏
+
+4. 更新 README.md
+   - 添加平台特定安装说明
+   - 添加平台特定系统要求
+   - 添加平台支持章节
+
+5. 构建测试
+   - TypeScript 编译成功
+   - Vite 构建成功
+   - electron-builder 打包成功
+
+待开发功能
+----------
+参见 GitHub Issues
+
+许可证
+------
+MIT

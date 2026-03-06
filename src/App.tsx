@@ -9,6 +9,7 @@ import ConfigStep2 from './pages/ConfigStep2';
 import ConfigStep3 from './pages/ConfigStep3';
 import ConfigStep4 from './pages/ConfigStep4';
 import Dashboard from './pages/Dashboard';
+import PluginManager from './pages/PluginManager';
 import './App.css';
 
 function App() {
@@ -72,7 +73,9 @@ function App() {
           />
         );
       case 'dashboard':
-        return <Dashboard config={config as OpenClawConfig} />;
+        return <Dashboard config={config as OpenClawConfig} onNavigate={setCurrentPage} />;
+      case 'plugin-manager':
+        return <PluginManager onBack={() => setCurrentPage('dashboard')} />;
       default:
         return <Welcome onNext={() => setCurrentPage('environment')} />;
     }

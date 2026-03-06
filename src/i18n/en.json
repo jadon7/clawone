@@ -117,5 +117,23 @@
     "language": "Language",
     "english": "English",
     "chinese": "中文"
+  },
+  "pluginManager": {
+    "title": "Plugin Manager",
+    "description": "Extend ClawOne functionality with plugins. Install and manage integrations for messaging platforms, automation tools, and more.",
+    "backToDashboard": "← Back to Dashboard",
+    "all": "All",
+    "messaging": "💬 Messaging",
+    "integration": "🔗 Integration",
+    "utility": "🛠️ Utility",
+    "install": "Install",
+    "installing": "Installing...",
+    "uninstall": "Uninstall",
+    "uninstalling": "Uninstalling...",
+    "installed": "Installed",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "installationLogs": "Installation Logs",
+    "confirmUninstall": "Are you sure you want to uninstall"
   }
 }

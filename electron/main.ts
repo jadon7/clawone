@@ -294,3 +294,68 @@ ipcMain.handle('download-update', async () => {
 ipcMain.handle('install-update', () => {
   autoUpdater.quitAndInstall(false, true);
 });
+
+// Plugin management IPC handlers
+ipcMain.handle('install-plugin', async (event, pluginId: string) => {
+  return new Promise((resolve) => {
+    const process = spawnCommand('npm', ['install', '-g', `@openclaw/plugin-${pluginId}@latest`]);
+
+    process.stdout?.on('data', (data) => {
+      event.sender.send('plugin-log', data.toString());
+    });
+
+    process.stderr?.on('data', (data) => {
+      event.sender.send('plugin-log', data.toString());
+    });
+
+    process.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true });
+      } else {
+        resolve({ success: false, error: `Installation failed with code ${code}` });
+      }
+    });
+  });
+});
+
+ipcMain.handle('uninstall-plugin', async (event, pluginId: string) => {
+  return new Promise((resolve) => {
+    const process = spawnCommand('npm', ['uninstall', '-g', `@openclaw/plugin-${pluginId}`]);
+
+    process.stdout?.on('data', (data) => {
+      event.sender.send('plugin-log', data.toString());
+    });
+
+    process.stderr?.on('data', (data) => {
+      event.sender.send('plugin-log', data.toString());
+    });
+
+    process.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true });
+      } else {
+        resolve({ success: false, error: `Uninstallation failed with code ${code}` });
+      }
+    });
+  });
+});
+
+ipcMain.handle('get-installed-plugins', async () => {
+  try {
+    const { stdout } = await execCommand('npm', ['list', '-g', '--depth=0']);
+    const plugins: string[] = [];
+
+    // Parse npm list output to find installed @openclaw/plugin-* packages
+    const lines = stdout.split('\n');
+    for (const line of lines) {
+      const match = line.match(/@openclaw\/plugin-(\w+)/);
+      if (match) {
+        plugins.push(match[1]);
+      }
+    }
+
+    return plugins;
+  } catch (error) {
+    return [];
+  }
+});

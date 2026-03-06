@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OpenClawConfig } from '../types';
+import { OpenClawConfig, Page } from '../types';
 
 interface DashboardProps {
   config: OpenClawConfig;
+  onNavigate: (page: Page) => void;
 }
 
-export default function Dashboard({ config }: DashboardProps) {
+export default function Dashboard({ config, onNavigate }: DashboardProps) {
   const { t } = useTranslation();
   const [serviceRunning, setServiceRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -169,6 +170,24 @@ export default function Dashboard({ config }: DashboardProps) {
         </div>
       </div>
 
+      {/* Quick actions */}
+      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
+        <button
+          className="button"
+          onClick={() => onNavigate('plugin-manager')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          🔌 Plugin Manager
+        </button>
+        <button
+          className="button button-secondary"
+          onClick={checkForUpdates}
+          disabled={updateChecking}
+        >
+          {updateChecking ? 'Checking for updates...' : '🔄 Check for Updates'}
+        </button>
+      </div>
+
       {/* Update notification card */}
       {(updateAvailable || updateDownloaded || updateError) && (
         <div className="dashboard-card" style={{ marginBottom: '24px' }}>
@@ -235,17 +254,6 @@ export default function Dashboard({ config }: DashboardProps) {
           )}
         </div>
       )}
-
-      {/* Check for updates button */}
-      <div style={{ marginBottom: '24px', textAlign: 'center' }}>
-        <button
-          className="button button-secondary"
-          onClick={checkForUpdates}
-          disabled={updateChecking}
-        >
-          {updateChecking ? 'Checking for updates...' : 'Check for Updates'}
-        </button>
-      </div>
 
       <div className="dashboard-card" style={{ marginBottom: '24px' }}>
         <h3>{t('dashboard.serviceLogs')}</h3>

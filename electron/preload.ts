@@ -47,5 +47,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onUpdateDownloaded: (callback: (info: any) => void) => {
     ipcRenderer.on('update-downloaded', (_, info) => callback(info));
+  },
+
+  // Plugin management
+  installPlugin: (pluginId: string) => ipcRenderer.invoke('install-plugin', pluginId),
+  uninstallPlugin: (pluginId: string) => ipcRenderer.invoke('uninstall-plugin', pluginId),
+  getInstalledPlugins: () => ipcRenderer.invoke('get-installed-plugins'),
+  onPluginLog: (callback: (log: string) => void) => {
+    ipcRenderer.on('plugin-log', (_, log) => callback(log));
   }
 });

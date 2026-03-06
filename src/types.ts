@@ -20,12 +20,28 @@ export interface ElectronAPI {
   onUpdateError: (callback: (error: string) => void) => void;
   onUpdateDownloadProgress: (callback: (progress: any) => void) => void;
   onUpdateDownloaded: (callback: (info: any) => void) => void;
+  installPlugin: (pluginId: string) => Promise<{ success: boolean; error?: string }>;
+  uninstallPlugin: (pluginId: string) => Promise<{ success: boolean; error?: string }>;
+  getInstalledPlugins: () => Promise<string[]>;
+  onPluginLog: (callback: (log: string) => void) => void;
 }
 
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
   }
+}
+
+export interface Plugin {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: 'messaging' | 'integration' | 'utility';
+  packageName: string;
+  installed: boolean;
+  enabled: boolean;
+  version?: string;
 }
 
 export interface OpenClawConfig {
@@ -41,6 +57,12 @@ export interface OpenClawConfig {
     discord?: boolean;
     slack?: boolean;
   };
+  plugins?: {
+    [key: string]: {
+      enabled: boolean;
+      config?: any;
+    };
+  };
 }
 
 export type Page =
@@ -51,4 +73,5 @@ export type Page =
   | 'config-step2'
   | 'config-step3'
   | 'config-step4'
-  | 'dashboard';
+  | 'dashboard'
+  | 'plugin-manager';

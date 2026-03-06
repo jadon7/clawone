@@ -13,19 +13,36 @@ const __dirname = path.dirname(__filename);
 
 const execAsync = promisify(exec);
 
-// Helper function to execute commands in a cross-platform way
-const execCommand = (command: string, args: string[] = []): Promise<{ stdout: string; stderr: string }> => {
+// Helper function to execute commands in a cross-platform way with timeout
+const execCommand = (command: string, args: string[] = [], timeoutMs: number = 10000): Promise<{ stdout: string; stderr: string }> => {
   return new Promise((resolve, reject) => {
     const isWindows = process.platform === 'win32';
     const shell = isWindows ? true : false;
     const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
 
-    exec(fullCommand, { shell }, (error, stdout, stderr) => {
+    const child = exec(fullCommand, { shell, timeout: timeoutMs }, (error, stdout, stderr) => {
       if (error) {
-        reject(error);
+        // Don't reject on command not found, just return empty result
+        if (error.code === 'ENOENT' || error.message.includes('not found')) {
+          reject(error);
+        } else if (error.killed) {
+          reject(new Error('Command timeout'));
+        } else {
+          reject(error);
+        }
       } else {
         resolve({ stdout, stderr });
       }
+    });
+
+    // Additional timeout safety
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error('Command timeout'));
+    }, timeoutMs);
+
+    child.on('exit', () => {
+      clearTimeout(timeout);
     });
   });
 };

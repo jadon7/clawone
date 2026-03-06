@@ -17,24 +17,65 @@ export default function Environment({ onNext }: EnvironmentProps) {
   const [npmCheck, setNpmCheck] = useState<CheckResult | null>(null);
   const [gitCheck, setGitCheck] = useState<CheckResult | null>(null);
   const [checking, setChecking] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     checkEnvironment();
   }, []);
 
+  const checkWithTimeout = async <T,>(
+    promise: Promise<T>,
+    timeoutMs: number = 10000
+  ): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), timeoutMs)
+      )
+    ]);
+  };
+
   const checkEnvironment = async () => {
     setChecking(true);
+    setError(null);
+    setNodeCheck(null);
+    setNpmCheck(null);
+    setGitCheck(null);
 
-    const node = await window.electronAPI.checkNode();
-    setNodeCheck(node);
+    try {
+      // Check Node.js with timeout
+      try {
+        const node = await checkWithTimeout(window.electronAPI.checkNode(), 10000);
+        setNodeCheck(node);
+      } catch (err) {
+        console.error('Node check failed:', err);
+        setNodeCheck({ installed: false, version: null, valid: false });
+      }
 
-    const npm = await window.electronAPI.checkPackageManager('npm');
-    setNpmCheck(npm);
+      // Check npm with timeout
+      try {
+        const npm = await checkWithTimeout(window.electronAPI.checkPackageManager('npm'), 10000);
+        setNpmCheck(npm);
+      } catch (err) {
+        console.error('npm check failed:', err);
+        setNpmCheck({ installed: false, version: null });
+      }
 
-    const git = await window.electronAPI.checkGit();
-    setGitCheck(git);
+      // Check Git with timeout
+      try {
+        const git = await checkWithTimeout(window.electronAPI.checkGit(), 10000);
+        setGitCheck(git);
+      } catch (err) {
+        console.error('Git check failed:', err);
+        setGitCheck({ installed: false, version: null });
+      }
 
-    setChecking(false);
+      setChecking(false);
+    } catch (err) {
+      console.error('Environment check failed:', err);
+      setError((err as Error).message || 'Unknown error occurred');
+      setChecking(false);
+    }
   };
 
   const allChecksPass = () => {
@@ -101,7 +142,24 @@ export default function Environment({ onNext }: EnvironmentProps) {
         {renderCheckItem(t('environment.gitItem'), gitCheck)}
       </div>
 
-      {!checking && !allChecksPass() && (
+      {error && (
+        <div
+          style={{
+            background: '#fff5f5',
+            border: '2px solid #fc8181',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '24px'
+          }}
+        >
+          <strong style={{ color: '#c53030' }}>Error</strong>
+          <p style={{ color: '#742a2a', marginTop: '8px', marginBottom: '0' }}>
+            {error}
+          </p>
+        </div>
+      )}
+
+      {!checking && !error && !allChecksPass() && (
         <div
           style={{
             background: '#fff5f5',
@@ -124,13 +182,17 @@ export default function Environment({ onNext }: EnvironmentProps) {
       )}
 
       <div className="button-group">
-        <button className="button button-secondary" onClick={checkEnvironment}>
-          {t('environment.recheck')}
+        <button
+          className="button button-secondary"
+          onClick={checkEnvironment}
+          disabled={checking}
+        >
+          {checking ? t('environment.checking') : t('environment.recheck')}
         </button>
         <button
           className="button"
           onClick={onNext}
-          disabled={!allChecksPass()}
+          disabled={!allChecksPass() || checking}
         >
           {t('environment.continue')}
         </button>

@@ -4,8 +4,8 @@ ClawOne 项目状态报告
 项目概述
 --------
 ClawOne 是一个基于 Electron + React + TypeScript 的 OpenClaw 一键安装器。
-当前版本：1.0.3
-最近提交：feat: add plugin management system
+当前版本：1.0.4
+最近提交：fix: #7 resolve environment check hanging issue
 
 技术栈
 ------
@@ -193,8 +193,33 @@ IPC 通信接口
    - 实时安装日志
    - 8个预配置插件
    - 中英文国际化支持
+✅ Issue #7: 修复环境检测卡死问题
+   - 添加命令执行超时处理（10秒）
+   - 为每个检测项添加独立超时
+   - 添加错误状态显示
+   - 添加重试机制
+   - 防止命令执行挂起
 
-最近更新 (插件管理系统)
+最近更新 (Issue #7 修复)
+-----------------------
+修复环境检测页面卡死问题：
+1. 在 main.ts 的 execCommand 添加超时处理
+   - 设置 10 秒超时限制
+   - 添加子进程 kill 机制
+   - 处理 ENOENT 和超时错误
+2. 在 Environment.tsx 添加超时和错误处理
+   - 为每个检测添加独立超时（10秒）
+   - 添加 checkWithTimeout 辅助函数
+   - 添加 try-catch 错误捕获
+   - 添加错误状态显示
+3. 改进 UI 交互
+   - 检测中禁用重新检查按钮
+   - 显示检测状态文本
+   - 添加错误提示卡片
+4. 构建测试通过
+5. 提交：71888db
+
+历史更新 (插件管理系统)
 -----------------------
 实现完整的插件管理功能：
 1. 创建 PluginManager.tsx 页面

@@ -96,9 +96,9 @@ export default function Environment({ onNext }: EnvironmentProps) {
       </p>
 
       <div style={{ marginBottom: '32px' }}>
-        {renderCheckItem('Node.js (≥22)', nodeCheck)}
-        {renderCheckItem('npm', npmCheck)}
-        {renderCheckItem('Git', gitCheck)}
+        {renderCheckItem(t('environment.nodeItem'), nodeCheck)}
+        {renderCheckItem(t('environment.npmItem'), npmCheck)}
+        {renderCheckItem(t('environment.gitItem'), gitCheck)}
       </div>
 
       {!checking && !allChecksPass() && (
@@ -115,10 +115,10 @@ export default function Environment({ onNext }: EnvironmentProps) {
           <p style={{ color: '#742a2a', marginTop: '8px', marginBottom: '0' }}>
             {t('environment.pleaseInstall')}
             <br />
-            {!nodeCheck?.installed && '• Node.js: https://nodejs.org/'}
+            {!nodeCheck?.installed && t('environment.nodeUrl')}
             {nodeCheck?.installed && !nodeCheck?.valid && `• ${t('environment.nodeRequired')}`}
             <br />
-            {!gitCheck?.installed && '• Git: https://git-scm.com/'}
+            {!gitCheck?.installed && t('environment.gitUrl')}
           </p>
         </div>
       )}

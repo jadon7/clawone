@@ -82,22 +82,11 @@ function App() {
     <div className="app">
       <button
         onClick={toggleLanguage}
-        style={{
-          position: 'fixed',
-          top: '16px',
-          right: '16px',
-          padding: '8px 16px',
-          background: '#4299e1',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: '500',
-          zIndex: 1000
-        }}
+        className="language-toggle"
+        title={i18n.language === 'en' ? 'Switch to Chinese' : '切换到英文'}
       >
-        {i18n.language === 'en' ? '中文' : 'English'}
+        <span className="language-icon">🌐</span>
+        <span className="language-text">{i18n.language === 'en' ? '中文' : 'English'}</span>
       </button>
       {renderPage()}
     </div>

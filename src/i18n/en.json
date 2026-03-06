@@ -15,6 +15,11 @@
     "installationRequired": "Installation Required",
     "pleaseInstall": "Please install the missing dependencies:",
     "nodeRequired": "• Node.js ≥22 required",
+    "nodeItem": "Node.js (≥22)",
+    "npmItem": "npm",
+    "gitItem": "Git",
+    "nodeUrl": "• Node.js: https://nodejs.org/",
+    "gitUrl": "• Git: https://git-scm.com/",
     "recheck": "Recheck",
     "continue": "Continue"
   },
@@ -36,6 +41,13 @@
       "selectProvider": "Select a provider...",
       "localModel": "Local Model",
       "ollamaInfo": "Ollama runs models locally on your machine. Make sure you have Ollama installed and running.",
+      "providers": {
+        "anthropic": "Anthropic Claude",
+        "openai": "OpenAI",
+        "ollama": "Ollama (Local)",
+        "azure": "Azure OpenAI",
+        "google": "Google Gemini"
+      },
       "next": "Next"
     },
     "step2": {
@@ -65,6 +77,12 @@
     "step4": {
       "title": "Configuration - Step 4",
       "description": "Select messaging channels (optional)",
+      "channels": {
+        "whatsapp": "WhatsApp",
+        "telegram": "Telegram",
+        "discord": "Discord",
+        "slack": "Slack"
+      },
       "optionalConfig": "Optional Configuration",
       "optionalInfo": "You can skip this step and configure messaging channels later. Each channel will require additional setup in the configuration file.",
       "back": "Back",

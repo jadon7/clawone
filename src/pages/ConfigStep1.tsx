@@ -10,11 +10,11 @@ interface ConfigStep1Props {
 export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep1Props) {
   const { t } = useTranslation();
   const providers = [
-    { value: 'anthropic', label: 'Anthropic Claude' },
-    { value: 'openai', label: 'OpenAI' },
-    { value: 'ollama', label: 'Ollama (Local)' },
-    { value: 'azure', label: 'Azure OpenAI' },
-    { value: 'google', label: 'Google Gemini' }
+    { value: 'anthropic', label: t('config.step1.providers.anthropic') },
+    { value: 'openai', label: t('config.step1.providers.openai') },
+    { value: 'ollama', label: t('config.step1.providers.ollama') },
+    { value: 'azure', label: t('config.step1.providers.azure') },
+    { value: 'google', label: t('config.step1.providers.google') }
   ];
 
   const handleProviderChange = (provider: string) => {

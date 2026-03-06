@@ -43,10 +43,10 @@ export default function ConfigStep4({ config, updateConfig, onNext, onBack }: Co
   };
 
   const channelOptions = [
-    { id: 'whatsapp', label: 'WhatsApp' },
-    { id: 'telegram', label: 'Telegram' },
-    { id: 'discord', label: 'Discord' },
-    { id: 'slack', label: 'Slack' }
+    { id: 'whatsapp', label: t('config.step4.channels.whatsapp') },
+    { id: 'telegram', label: t('config.step4.channels.telegram') },
+    { id: 'discord', label: t('config.step4.channels.discord') },
+    { id: 'slack', label: t('config.step4.channels.slack') }
   ];
 
   return (

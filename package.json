@@ -44,6 +44,7 @@
   "build": {
     "appId": "com.clawone.app",
     "productName": "ClawOne",
+    "asar": false,
     "directories": {
       "output": "release"
     },

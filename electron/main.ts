@@ -58,13 +58,78 @@ const getLoginShellPath = async (): Promise<string> => {
   }
 };
 
-// Execute a command, trying login shell PATH first, then fallback paths
-const execCommand = async (command: string, args: string[] = [], timeoutMs: number = 10000): Promise<{ stdout: string; stderr: string; resolvedPath?: string }> => {
-  const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+// Try to find command using 'which' with different shells
+const findCommandWithWhich = async (command: string): Promise<string | null> => {
+  if (process.platform === 'win32') return null;
 
-  const runWith = (env: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string }> =>
+  const shells = [
+    process.env.SHELL,
+    '/bin/zsh',
+    '/bin/bash',
+    '/bin/sh'
+  ].filter(Boolean);
+
+  for (const shell of shells) {
+    try {
+      const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+        exec(`${shell} -l -c 'which ${command}'`, { timeout: 3000 }, (err, stdout, stderr) => {
+          if (err) reject(err);
+          else resolve({ stdout, stderr });
+        });
+      });
+      const path = stdout.trim();
+      if (path && path !== `${command} not found` && !path.includes('not found')) {
+        return path;
+      }
+    } catch {}
+  }
+  return null;
+};
+
+// Direct path checks for common tools
+const findCommandInCommonPaths = (command: string): string | null => {
+  if (process.platform === 'win32') return null;
+
+  const home = process.env.HOME || '';
+  const commonPaths = [
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/homebrew/bin',
+    `${home}/.nvm/versions/node/current/bin`,
+    `${home}/.volta/bin`,
+    `${home}/.fnm/current/bin`,
+    `${home}/.asdf/shims`,
+    `${home}/n/bin`,
+    `${home}/.npm-global/bin`,
+    `${home}/.yarn/bin`,
+    '/usr/local/opt/node/bin',
+    '/usr/local/opt/git/bin',
+  ];
+
+  for (const dir of commonPaths) {
+    try {
+      const fullPath = `${dir}/${command}`;
+      // Use sync version for simplicity
+      const { execSync } = require('child_process');
+      execSync(`test -x "${fullPath}"`, { stdio: 'pipe' });
+      return fullPath;
+    } catch {}
+  }
+  return null;
+};
+
+// Execute a command with multiple fallback strategies
+const execCommand = async (command: string, args: string[] = [], timeoutMs: number = 10000): Promise<{ stdout: string; stderr: string; resolvedPath?: string; foundAt?: string }> => {
+  const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+  const debugInfo: string[] = [];
+
+  const runWith = (env: NodeJS.ProcessEnv, cmd?: string): Promise<{ stdout: string; stderr: string }> =>
     new Promise((resolve, reject) => {
-      const child = exec(fullCommand, { shell: true, timeout: timeoutMs, env }, (error, stdout, stderr) => {
+      const execCmd = cmd || fullCommand;
+      const child = exec(execCmd, { shell: true, timeout: timeoutMs, env }, (error, stdout, stderr) => {
         if (error) {
           if (error.killed) reject(new Error('Command timeout'));
           else reject(error);
@@ -76,21 +141,42 @@ const execCommand = async (command: string, args: string[] = [], timeoutMs: numb
       child.on('exit', () => clearTimeout(t));
     });
 
-  // Strategy 1: login shell PATH
+  // Strategy 1: Try to find exact path using 'which' and run directly
+  try {
+    const cmdPath = await findCommandWithWhich(command);
+    if (cmdPath) {
+      debugInfo.push(`Found via which: ${cmdPath}`);
+      const result = await runWith(process.env, `${cmdPath} ${args.join(' ')}`);
+      return { ...result, resolvedPath: process.env.PATH, foundAt: cmdPath };
+    }
+  } catch {}
+
+  // Strategy 2: Check common installation paths directly
+  try {
+    const cmdPath = findCommandInCommonPaths(command);
+    if (cmdPath) {
+      debugInfo.push(`Found in common path: ${cmdPath}`);
+      const result = await runWith(process.env, `${cmdPath} ${args.join(' ')}`);
+      return { ...result, resolvedPath: process.env.PATH, foundAt: cmdPath };
+    }
+  } catch {}
+
+  // Strategy 3: login shell PATH
   try {
     const loginPath = await getLoginShellPath();
     const env = { ...process.env, PATH: loginPath };
     const result = await runWith(env);
-    return { ...result, resolvedPath: loginPath };
+    return { ...result, resolvedPath: loginPath, foundAt: debugInfo[0]?.replace('Found via which: ', '') };
   } catch {}
 
-  // Strategy 2: enriched static PATH
+  // Strategy 4: enriched static PATH
   try {
     const env = getShellEnv();
     const result = await runWith(env);
     return { ...result, resolvedPath: env.PATH };
   } catch (err) {
-    throw err;
+    const errorMsg = `Tried: ${debugInfo.join(', ') || 'all strategies'}. Error: ${(err as Error).message}`;
+    throw new Error(errorMsg);
   }
 };
 
@@ -201,46 +287,59 @@ app.on('activate', () => {
 // Check Node.js version
 ipcMain.handle('check-node', async () => {
   try {
-    const { stdout, resolvedPath } = await execCommand('node', ['--version']);
+    const { stdout, foundAt } = await execCommand('node', ['--version']);
     const version = stdout.trim().replace('v', '');
     const major = parseInt(version.split('.')[0]);
-    const result = { installed: true, version, valid: major >= 22, debug: `Found via PATH: ${resolvedPath?.split(':').slice(0,3).join(':')}...` };
+    const result = { 
+      installed: true, 
+      version, 
+      valid: major >= 22, 
+      debug: `Found at: ${foundAt || 'PATH'}` 
+    };
     console.log('[check-node]', result);
     return result;
   } catch (error) {
     const msg = (error as Error).message;
     console.error('[check-node] failed:', msg);
-    return { installed: false, version: null, valid: false, debug: `Error: ${msg}` };
+    return { installed: false, version: null, valid: false, debug: `Not found. ${msg}` };
   }
 });
 
 // Check package manager
 ipcMain.handle('check-package-manager', async (_, manager: string) => {
   try {
-    const { stdout, resolvedPath } = await execCommand(manager, ['--version']);
+    const { stdout, foundAt } = await execCommand(manager, ['--version']);
     const version = stdout.trim();
-    const result = { installed: true, version, debug: `Found via PATH: ${resolvedPath?.split(':').slice(0,3).join(':')}...` };
+    const result = { 
+      installed: true, 
+      version, 
+      debug: `Found at: ${foundAt || 'PATH'}` 
+    };
     console.log(`[check-${manager}]`, result);
     return result;
   } catch (error) {
     const msg = (error as Error).message;
     console.error(`[check-${manager}] failed:`, msg);
-    return { installed: false, version: null, debug: `Error: ${msg}` };
+    return { installed: false, version: null, debug: `Not found. ${msg}` };
   }
 });
 
 // Check Git
 ipcMain.handle('check-git', async () => {
   try {
-    const { stdout, resolvedPath } = await execCommand('git', ['--version']);
+    const { stdout, foundAt } = await execCommand('git', ['--version']);
     const version = stdout.trim();
-    const result = { installed: true, version, debug: `Found via PATH: ${resolvedPath?.split(':').slice(0,3).join(':')}...` };
+    const result = { 
+      installed: true, 
+      version, 
+      debug: `Found at: ${foundAt || 'PATH'}` 
+    };
     console.log('[check-git]', result);
     return result;
   } catch (error) {
     const msg = (error as Error).message;
     console.error('[check-git] failed:', msg);
-    return { installed: false, version: null, debug: `Error: ${msg}` };
+    return { installed: false, version: null, debug: `Not found. ${msg}` };
   }
 });
 

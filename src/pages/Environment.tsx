@@ -18,7 +18,7 @@ export default function Environment({ onNext }: EnvironmentProps) {
   const [npmCheck, setNpmCheck] = useState<CheckResult | null>(null);
   const [gitCheck, setGitCheck] = useState<CheckResult | null>(null);
   const [checking, setChecking] = useState(true);
-  const [showDebug, setShowDebug] = useState(false);
+  const [showDebug, setShowDebug] = useState(true); // 默认展开调试信息
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   useEffect(() => {

@@ -155,13 +155,61 @@ export default function Environment({ onNext }: EnvironmentProps) {
           marginBottom: '24px'
         }}>
           <strong style={{ color: '#c53030' }}>{t('environment.installationRequired')}</strong>
-          <p style={{ color: '#742a2a', marginTop: '8px', marginBottom: '0' }}>
+          <p style={{ color: '#742a2a', marginTop: '8px', marginBottom: '12px' }}>
             {t('environment.pleaseInstall')}
-            <br />
-            {!nodeCheck?.installed && t('environment.nodeUrl')}
-            {nodeCheck?.installed && !nodeCheck?.valid && `• ${t('environment.nodeRequired')}`}
-            <br />
-            {!gitCheck?.installed && t('environment.gitUrl')}
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {(!nodeCheck?.installed || (nodeCheck?.installed && !nodeCheck?.valid)) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ color: '#742a2a', minWidth: '120px' }}>
+                  {!nodeCheck?.installed ? 'Node.js (≥22)' : t('environment.nodeRequired')}
+                </span>
+                <button
+                  onClick={() => window.electronAPI.openExternal('https://nodejs.org/')}
+                  style={{
+                    background: '#3182ce',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    fontWeight: 500
+                  }}
+                >
+                  {t('environment.downloadNode')}
+                </button>
+              </div>
+            )}
+            {!npmCheck?.installed && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ color: '#742a2a', minWidth: '120px' }}>npm</span>
+                <span style={{ color: '#742a2a', fontSize: '13px' }}>{t('environment.npmIncluded')}</span>
+              </div>
+            )}
+            {!gitCheck?.installed && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ color: '#742a2a', minWidth: '120px' }}>Git</span>
+                <button
+                  onClick={() => window.electronAPI.openExternal('https://git-scm.com/downloads')}
+                  style={{
+                    background: '#3182ce',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    fontWeight: 500
+                  }}
+                >
+                  {t('environment.downloadGit')}
+                </button>
+              </div>
+            )}
+          </div>
+          <p style={{ color: '#742a2a', marginTop: '12px', marginBottom: '0', fontSize: '13px' }}>
+            {t('environment.afterInstall')}
           </p>
         </div>
       )}

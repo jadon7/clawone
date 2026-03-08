@@ -1,4 +1,5 @@
 export interface ElectronAPI {
+  openExternal: (url: string) => Promise<void>;
   checkNode: () => Promise<{ installed: boolean; version: string | null; valid: boolean; debug?: string }>;
   checkPackageManager: (manager: string) => Promise<{ installed: boolean; version: string | null; debug?: string }>;
   checkGit: () => Promise<{ installed: boolean; version: string | null; debug?: string }>;

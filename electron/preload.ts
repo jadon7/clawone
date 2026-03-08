@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Open external URL
+  openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
+
   // Environment checks
   checkNode: () => ipcRenderer.invoke('check-node'),
   checkPackageManager: (manager: string) => ipcRenderer.invoke('check-package-manager', manager),

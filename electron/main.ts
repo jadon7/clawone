@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
@@ -283,6 +283,11 @@ app.on('activate', () => {
 });
 
 // IPC Handlers
+
+// Open external URL in default browser
+ipcMain.handle('open-external', async (_, url: string) => {
+  await shell.openExternal(url);
+});
 
 // Check Node.js version
 ipcMain.handle('check-node', async () => {

@@ -20,6 +20,10 @@
     "gitItem": "Git",
     "nodeUrl": "• Node.js: https://nodejs.org/",
     "gitUrl": "• Git: https://git-scm.com/",
+    "downloadNode": "Download Node.js",
+    "downloadGit": "Download Git",
+    "npmIncluded": "npm is included with Node.js",
+    "afterInstall": "After installing, click \"Recheck\" to verify.",
     "recheck": "Recheck",
     "continue": "Continue"
   },

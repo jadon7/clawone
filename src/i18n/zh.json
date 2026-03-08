@@ -20,6 +20,10 @@
     "gitItem": "Git",
     "nodeUrl": "• Node.js: https://nodejs.org/",
     "gitUrl": "• Git: https://git-scm.com/",
+    "downloadNode": "下载 Node.js",
+    "downloadGit": "下载 Git",
+    "npmIncluded": "npm 随 Node.js 一起安装",
+    "afterInstall": "安装完成后，点击「重新检测」验证。",
     "recheck": "重新检测",
     "continue": "继续"
   },

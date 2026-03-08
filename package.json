@@ -55,7 +55,8 @@
     "publish": {
       "provider": "github",
       "owner": "jadon7",
-      "repo": "clawone"
+      "repo": "clawone",
+      "releaseType": "release"
     },
     "mac": {
       "target": [

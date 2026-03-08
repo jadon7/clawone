@@ -115,7 +115,9 @@
     "fromTerminal": "from your terminal.",
     "starting": "Starting OpenClaw service...",
     "startSuccess": "Service started successfully!",
-    "stopSuccess": "Service stopped."
+    "stopSuccess": "Service stopped.",
+    "downloadOnlineConfig": "Download Online Config",
+    "downloadOnlineConfigComingSoon": "This feature is coming soon."
   },
   "common": {
     "language": "Language",

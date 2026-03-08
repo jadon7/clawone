@@ -181,6 +181,13 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
         </button>
         <button
           className="button button-secondary"
+          onClick={() => alert(t('dashboard.downloadOnlineConfigComingSoon'))}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          ☁️ {t('dashboard.downloadOnlineConfig')}
+        </button>
+        <button
+          className="button button-secondary"
           onClick={checkForUpdates}
           disabled={updateChecking}
         >

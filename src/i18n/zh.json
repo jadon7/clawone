@@ -115,7 +115,9 @@
     "fromTerminal": "命令。",
     "starting": "正在启动 OpenClaw 服务...",
     "startSuccess": "服务启动成功！",
-    "stopSuccess": "服务已停止。"
+    "stopSuccess": "服务已停止。",
+    "downloadOnlineConfig": "下载网上配置",
+    "downloadOnlineConfigComingSoon": "该功能正在开发中。"
   },
   "common": {
     "language": "语言",

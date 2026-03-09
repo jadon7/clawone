@@ -45,6 +45,38 @@ export interface Plugin {
   version?: string;
 }
 
+export interface ChannelFieldDefinition {
+  id: string;
+  label: string;
+  labelZh: string;
+  placeholder: string;
+  cliFlag?: string;
+  required?: boolean;
+  secret?: boolean;
+}
+
+export interface ChannelDefinition {
+  id: string;
+  name: string;
+  nameZh: string;
+  setupLabel: string;
+  setupLabelZh: string;
+  summary: string;
+  summaryZh: string;
+  docsUrl: string;
+  commandMode: 'login' | 'add' | 'plugin' | 'manual';
+  fields: ChannelFieldDefinition[];
+  steps: string[];
+  stepsZh: string[];
+}
+
+export interface ChannelDraft {
+  enabled: boolean;
+  values: Record<string, string>;
+}
+
+export type ChannelDraftMap = Record<string, ChannelDraft>;
+
 export interface OpenClawConfig {
   ai: {
     provider: string;
@@ -52,16 +84,11 @@ export interface OpenClawConfig {
     model?: string;
   };
   workspace: string;
-  channels?: {
-    whatsapp?: boolean;
-    telegram?: boolean;
-    discord?: boolean;
-    slack?: boolean;
-  };
+  channels?: ChannelDraftMap;
   plugins?: {
     [key: string]: {
       enabled: boolean;
-      config?: any;
+      config?: unknown;
     };
   };
 }

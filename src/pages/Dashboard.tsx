@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OpenClawConfig, Page } from '../types';
+import { getChannelName, getEnabledChannels } from '../channelCatalog';
 
 interface DashboardProps {
   config: OpenClawConfig;
@@ -8,7 +9,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ config, onNavigate }: DashboardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [serviceRunning, setServiceRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [checking, setChecking] = useState(false);
@@ -21,6 +22,7 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
   const [updateDownloaded, setUpdateDownloaded] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const enabledChannels = getEnabledChannels(config.channels).map((channelId) => getChannelName(channelId, i18n.language));
 
   useEffect(() => {
     checkStatus();
@@ -157,14 +159,11 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
         <div className="dashboard-card">
           <h3>{t('dashboard.configuration')}</h3>
           <div style={{ fontSize: '14px', color: '#4a5568' }}>
-            <p><strong>{t('dashboard.provider')}:</strong> {config.ai.provider}</p>
+            <p><strong>{t('dashboard.provider')}:</strong> {config.ai?.provider || t('dashboard.none')}</p>
             <p><strong>{t('dashboard.workspace')}:</strong> {config.workspace}</p>
             <p>
               <strong>{t('dashboard.channels')}:</strong>{' '}
-              {Object.entries(config.channels || {})
-                .filter(([_, enabled]) => enabled)
-                .map(([name]) => name)
-                .join(', ') || t('dashboard.none')}
+              {enabledChannels.join(', ') || t('dashboard.none')}
             </p>
           </div>
         </div>

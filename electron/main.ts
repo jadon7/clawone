@@ -12,6 +12,77 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const execAsync = promisify(exec);
+const SUPPORTED_CHANNELS = [
+  'telegram',
+  'whatsapp',
+  'discord',
+  'irc',
+  'googlechat',
+  'slack',
+  'signal',
+  'imessage',
+  'feishu',
+  'nostr',
+  'msteams',
+  'mattermost',
+  'nextcloud-talk',
+  'matrix',
+  'bluebubbles',
+  'line',
+  'zalo',
+  'zalouser',
+  'synology-chat',
+  'tlon',
+] as const;
+
+type ChannelSetupDraft = {
+  enabled?: boolean;
+  values?: Record<string, string>;
+};
+
+const CHANNEL_ADD_FLAGS: Partial<Record<(typeof SUPPORTED_CHANNELS)[number], Record<string, string>>> = {
+  telegram: {
+    token: '--token',
+  },
+  discord: {
+    token: '--token',
+  },
+  googlechat: {
+    webhookUrl: '--webhook-url',
+    audience: '--audience',
+    audienceType: '--audience-type',
+  },
+  slack: {
+    appToken: '--app-token',
+    botToken: '--bot-token',
+  },
+  signal: {
+    cliPath: '--cli-path',
+    httpUrl: '--http-url',
+    signalNumber: '--signal-number',
+  },
+  imessage: {
+    cliPath: '--cli-path',
+    dbPath: '--db-path',
+    service: '--service',
+    region: '--region',
+  },
+  matrix: {
+    homeserver: '--homeserver',
+    userId: '--user-id',
+    accessToken: '--access-token',
+    password: '--password',
+    deviceName: '--device-name',
+  },
+  bluebubbles: {
+    webhookPath: '--webhook-path',
+  },
+  tlon: {
+    ship: '--ship',
+    url: '--url',
+    code: '--code',
+  },
+};
 
 // Get enriched PATH for finding tools installed via nvm, homebrew, volta, etc.
 const getShellEnv = (): NodeJS.ProcessEnv => {
@@ -129,7 +200,7 @@ const execCommand = async (command: string, args: string[] = [], timeoutMs: numb
   const runWith = (env: NodeJS.ProcessEnv, cmd?: string): Promise<{ stdout: string; stderr: string }> =>
     new Promise((resolve, reject) => {
       const execCmd = cmd || fullCommand;
-      const child = exec(execCmd, { shell: true, timeout: timeoutMs, env }, (error, stdout, stderr) => {
+      const child = exec(execCmd, { timeout: timeoutMs, env }, (error, stdout, stderr) => {
         if (error) {
           if (error.killed) reject(new Error('Command timeout'));
           else reject(error);
@@ -386,11 +457,113 @@ const getConfigPath = () => {
   return path.join(os.homedir(), '.openclaw', 'openclaw.json');
 };
 
+const getUiConfigPath = () => {
+  return path.join(os.homedir(), '.openclaw', 'clawone-ui.json');
+};
+
+const normalizeChannels = (channels: Record<string, boolean | ChannelSetupDraft> | undefined) => {
+  const normalized = new Map<string, ChannelSetupDraft>();
+
+  for (const channelId of SUPPORTED_CHANNELS) {
+    const current = channels?.[channelId];
+    if (typeof current === 'boolean') {
+      normalized.set(channelId, { enabled: current, values: {} });
+      continue;
+    }
+
+    normalized.set(channelId, {
+      enabled: Boolean(current?.enabled),
+      values: current?.values || {},
+    });
+  }
+
+  return normalized;
+};
+
+const bootstrapValidConfig = async (workspace: string) => {
+  const configPath = getConfigPath();
+
+  try {
+    await execCommand('openclaw', ['config', 'validate']);
+    return;
+  } catch {
+    try {
+      const rawConfig = await fs.readFile(configPath, 'utf-8');
+      const backupPath = path.join(
+        path.dirname(configPath),
+        `openclaw.invalid.${Date.now()}.json`
+      );
+      await fs.writeFile(backupPath, rawConfig, 'utf-8');
+    } catch {}
+  }
+
+  await execCommand('openclaw', [
+    'onboard',
+    '--non-interactive',
+    '--accept-risk',
+    '--mode',
+    'local',
+    '--flow',
+    'quickstart',
+    '--workspace',
+    workspace,
+    '--auth-choice',
+    'skip',
+    '--skip-channels',
+    '--skip-daemon',
+    '--skip-health',
+    '--skip-search',
+    '--skip-skills',
+    '--skip-ui',
+  ], 30000);
+};
+
+const isGatewayInstalled = (output: string) => {
+  return !output.includes('Gateway service not installed') && !output.includes('Service unit not found');
+};
+
+const isGatewayRunning = (output: string) => {
+  return output.includes('Service: LaunchAgent (loaded)') || output.toLowerCase().includes('runtime: running');
+};
+
+const emitCommandOutput = (event: Electron.IpcMainInvokeEvent, output: string) => {
+  output
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .forEach((line) => event.sender.send('service-log', line));
+};
+
+const applyChannelDraft = async (channelId: (typeof SUPPORTED_CHANNELS)[number], draft: ChannelSetupDraft) => {
+  if (!draft.enabled) {
+    await execCommand('openclaw', ['config', 'set', `channels.${channelId}.enabled`, 'false']);
+    return;
+  }
+
+  await execCommand('openclaw', ['config', 'set', `channels.${channelId}`, '{}']);
+
+  const cliFlags = CHANNEL_ADD_FLAGS[channelId];
+  if (!cliFlags) return;
+
+  const args = ['channels', 'add', '--channel', channelId];
+  let hasSetupValues = false;
+
+  for (const [fieldId, flag] of Object.entries(cliFlags)) {
+    const value = draft.values?.[fieldId]?.trim();
+    if (!value) continue;
+    args.push(flag, value);
+    hasSetupValues = true;
+  }
+
+  if (hasSetupValues) {
+    await execCommand('openclaw', args, 30000);
+  }
+};
+
 // Read config
 ipcMain.handle('read-config', async () => {
   try {
-    const configPath = getConfigPath();
-    const data = await fs.readFile(configPath, 'utf-8');
+    const data = await fs.readFile(getUiConfigPath(), 'utf-8');
     return JSON.parse(data);
   } catch (error) {
     return null;
@@ -400,11 +573,24 @@ ipcMain.handle('read-config', async () => {
 // Write config
 ipcMain.handle('write-config', async (_, config: any) => {
   try {
-    const configPath = getConfigPath();
-    const configDir = path.dirname(configPath);
-
+    // Persist UI snapshot for ClawOne display/reload.
+    const configDir = path.dirname(getConfigPath());
     await fs.mkdir(configDir, { recursive: true });
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    await fs.writeFile(getUiConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
+
+    const workspace = typeof config?.workspace === 'string' ? config.workspace : '~/.openclaw/workspace';
+    await bootstrapValidConfig(workspace);
+
+    await execCommand('openclaw', ['config', 'set', 'gateway.mode', JSON.stringify('local')]);
+    await execCommand('openclaw', ['config', 'set', 'gateway.bind', JSON.stringify('loopback')]);
+    await execCommand('openclaw', ['config', 'set', 'agents.defaults.workspace', JSON.stringify(workspace)]);
+
+    const selectedChannels = normalizeChannels(config?.channels || {});
+    for (const channelId of SUPPORTED_CHANNELS) {
+      await applyChannelDraft(channelId, selectedChannels.get(channelId) || { enabled: false, values: {} });
+    }
+
+    await execCommand('openclaw', ['config', 'validate']);
 
     return { success: true };
   } catch (error) {
@@ -423,31 +609,40 @@ ipcMain.handle('test-api-connection', async (_, provider: string, apiKey: string
 
 // Start OpenClaw service
 ipcMain.handle('start-openclaw', async (event) => {
-  return new Promise((resolve, reject) => {
-    const process = spawnCommand('openclaw', ['start']);
+  try {
+    const statusBefore = await execCommand('openclaw', ['gateway', 'status'], 30000);
+    emitCommandOutput(event, statusBefore.stdout);
 
-    process.stdout?.on('data', (data) => {
-      event.sender.send('service-log', data.toString());
-    });
+    if (!isGatewayInstalled(statusBefore.stdout)) {
+      event.sender.send('service-log', 'Gateway service is not installed. Installing it now...');
+      const installResult = await execCommand('openclaw', ['gateway', 'install'], 30000);
+      emitCommandOutput(event, installResult.stdout);
+      emitCommandOutput(event, installResult.stderr);
+    }
 
-    process.stderr?.on('data', (data) => {
-      event.sender.send('service-log', data.toString());
-    });
+    event.sender.send('service-log', 'Starting OpenClaw gateway service...');
+    const startResult = await execCommand('openclaw', ['gateway', 'start'], 30000);
+    emitCommandOutput(event, startResult.stdout);
+    emitCommandOutput(event, startResult.stderr);
 
-    process.on('close', (code) => {
-      if (code === 0) {
-        resolve({ success: true });
-      } else {
-        reject(new Error(`Service failed with code ${code}`));
-      }
-    });
-  });
+    const statusAfter = await execCommand('openclaw', ['gateway', 'status'], 30000);
+    emitCommandOutput(event, statusAfter.stdout);
+
+    if (!isGatewayRunning(statusAfter.stdout)) {
+      throw new Error('Gateway service did not enter a running state. Check the logs above.');
+    }
+
+    return { success: true };
+  } catch (error) {
+    event.sender.send('service-log', `Error: ${(error as Error).message}`);
+    throw error;
+  }
 });
 
 // Stop OpenClaw service
 ipcMain.handle('stop-openclaw', async () => {
   try {
-    await execCommand('openclaw', ['stop']);
+    await execCommand('openclaw', ['gateway', 'stop']);
     return { success: true };
   } catch (error) {
     return { success: false, error: (error as Error).message };
@@ -457,8 +652,11 @@ ipcMain.handle('stop-openclaw', async () => {
 // Get service status
 ipcMain.handle('get-service-status', async () => {
   try {
-    const { stdout } = await execCommand('openclaw', ['status']);
-    return { running: stdout.includes('running'), output: stdout };
+    const { stdout } = await execCommand('openclaw', ['gateway', 'status']);
+    return {
+      running: isGatewayRunning(stdout),
+      output: stdout
+    };
   } catch (error) {
     return { running: false, output: '' };
   }
@@ -554,7 +752,7 @@ ipcMain.handle('get-installed-plugins', async () => {
     // Parse npm list output to find installed @openclaw/plugin-* packages
     const lines = stdout.split('\n');
     for (const line of lines) {
-      const match = line.match(/@openclaw\/plugin-(\w+)/);
+      const match = line.match(/@openclaw\/plugin-([a-z0-9-]+)/i);
       if (match) {
         plugins.push(match[1]);
       }

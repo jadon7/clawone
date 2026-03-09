@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OpenClawConfig } from '../types';
+import { buildChannelCommand, CHANNEL_CATALOG, normalizeChannelDrafts } from '../channelCatalog';
 
 interface ConfigStep4Props {
   config: Partial<OpenClawConfig>;
@@ -10,14 +11,32 @@ interface ConfigStep4Props {
 }
 
 export default function ConfigStep4({ config, updateConfig, onNext, onBack }: ConfigStep4Props) {
-  const { t } = useTranslation();
-  const [channels, setChannels] = useState(config.channels || {});
+  const { t, i18n } = useTranslation();
+  const [channels, setChannels] = useState(() => normalizeChannelDrafts(config.channels));
+  const [selectedChannelId, setSelectedChannelId] = useState(CHANNEL_CATALOG[0]?.id || '');
   const [saving, setSaving] = useState(false);
 
-  const toggleChannel = (channel: string) => {
+  const toggleChannel = (channelId: string) => {
     setChannels(prev => ({
       ...prev,
-      [channel]: !prev[channel as keyof typeof prev]
+      [channelId]: {
+        ...prev[channelId],
+        enabled: !prev[channelId]?.enabled,
+        values: prev[channelId]?.values || {},
+      },
+    }));
+  };
+
+  const updateField = (channelId: string, fieldId: string, value: string) => {
+    setChannels((prev) => ({
+      ...prev,
+      [channelId]: {
+        enabled: prev[channelId]?.enabled || false,
+        values: {
+          ...(prev[channelId]?.values || {}),
+          [fieldId]: value,
+        },
+      },
     }));
   };
 
@@ -43,11 +62,18 @@ export default function ConfigStep4({ config, updateConfig, onNext, onBack }: Co
   };
 
   const channelOptions = [
-    { id: 'whatsapp', label: t('config.step4.channels.whatsapp') },
-    { id: 'telegram', label: t('config.step4.channels.telegram') },
-    { id: 'discord', label: t('config.step4.channels.discord') },
-    { id: 'slack', label: t('config.step4.channels.slack') }
+    ...CHANNEL_CATALOG
   ];
+  const selectedChannel = channelOptions.find((channel) => channel.id === selectedChannelId) || channelOptions[0];
+  if (!selectedChannel) {
+    return null;
+  }
+  const selectedDraft = channels[selectedChannel.id];
+  const setupSteps = i18n.language.startsWith('zh') ? selectedChannel.stepsZh : selectedChannel.steps;
+  const setupSummary = i18n.language.startsWith('zh') ? selectedChannel.summaryZh : selectedChannel.summary;
+  const setupLabel = i18n.language.startsWith('zh') ? selectedChannel.setupLabelZh : selectedChannel.setupLabel;
+  const commandPreview = buildChannelCommand(selectedChannel, selectedDraft);
+  const enabledCount = Object.values(channels).filter((draft) => draft.enabled).length;
 
   return (
     <div className="page">
@@ -61,17 +87,99 @@ export default function ConfigStep4({ config, updateConfig, onNext, onBack }: Co
       <h1>{t('config.step4.title')}</h1>
       <p>{t('config.step4.description')}</p>
 
-      <div className="checkbox-group" style={{ marginBottom: '24px' }}>
-        {channelOptions.map((channel) => (
-          <label key={channel.id} className="checkbox-item">
-            <input
-              type="checkbox"
-              checked={channels[channel.id as keyof typeof channels] || false}
-              onChange={() => toggleChannel(channel.id)}
-            />
-            <span>{channel.label}</span>
-          </label>
-        ))}
+      <div className="channel-flow">
+        <div className="channel-list">
+          <div className="channel-list-header">
+            <div>
+              <strong>{t('config.step4.catalogTitle')}</strong>
+              <p>{t('config.step4.catalogInfo', { count: channelOptions.length })}</p>
+            </div>
+            <span className="channel-count">{t('config.step4.enabledCount', { count: enabledCount })}</span>
+          </div>
+
+          <div className="channel-grid">
+            {channelOptions.map((channel) => {
+              const draft = channels[channel.id];
+              const localizedName = i18n.language.startsWith('zh') ? channel.nameZh : channel.name;
+              const localizedSetup = i18n.language.startsWith('zh') ? channel.setupLabelZh : channel.setupLabel;
+              return (
+                <button
+                  key={channel.id}
+                  type="button"
+                  className={`channel-card ${selectedChannelId === channel.id ? 'selected' : ''} ${draft?.enabled ? 'enabled' : ''}`}
+                  onClick={() => setSelectedChannelId(channel.id)}
+                >
+                  <div className="channel-card-header">
+                    <strong>{localizedName}</strong>
+                    <span className="channel-card-badge">{localizedSetup}</span>
+                  </div>
+                  <small>{draft?.enabled ? t('config.step4.selected') : t('config.step4.notSelected')}</small>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="channel-detail">
+          <div className="channel-detail-header">
+            <div>
+              <span className="channel-detail-kicker">{setupLabel}</span>
+              <h3>{i18n.language.startsWith('zh') ? selectedChannel.nameZh : selectedChannel.name}</h3>
+            </div>
+            <label className="channel-toggle">
+              <input
+                type="checkbox"
+                checked={selectedDraft?.enabled || false}
+                onChange={() => toggleChannel(selectedChannel.id)}
+              />
+              <span>{selectedDraft?.enabled ? t('config.step4.selected') : t('config.step4.enableChannel')}</span>
+            </label>
+          </div>
+
+          <p className="channel-detail-summary">{setupSummary}</p>
+
+          <div className="channel-detail-actions">
+            <button
+              className="button button-secondary"
+              onClick={() => window.electronAPI.openExternal(selectedChannel.docsUrl)}
+            >
+              {t('config.step4.openDocs')}
+            </button>
+          </div>
+
+          {selectedChannel.fields.length > 0 && (
+            <div className="channel-field-grid">
+              {selectedChannel.fields.map((field) => (
+                <div key={field.id} className="form-group">
+                  <label className="form-label">
+                    {i18n.language.startsWith('zh') ? field.labelZh : field.label}
+                  </label>
+                  <input
+                    type={field.secret ? 'password' : 'text'}
+                    className="form-input"
+                    value={selectedDraft?.values[field.id] || ''}
+                    onChange={(event) => updateField(selectedChannel.id, field.id, event.target.value)}
+                    placeholder={field.placeholder}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="channel-step-list">
+            {setupSteps.map((step, index) => (
+              <div key={step} className="channel-step-item">
+                <span>{index + 1}</span>
+                <p>{step}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="channel-command-box">
+            <strong>{t('config.step4.commandPreview')}</strong>
+            <code>{commandPreview}</code>
+          </div>
+        </div>
       </div>
 
       <div

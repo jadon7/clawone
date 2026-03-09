@@ -298,11 +298,7 @@ const createWindow = () => {
       contextIsolation: true,
       nodeIntegration: false
     },
-    // Use platform-specific title bar style with frame enabled for dragging
-    ...(process.platform === 'darwin' ? {
-      titleBarStyle: 'hiddenInset',
-      frame: true
-    } : {}),
+    frame: true,
     resizable: true,
     minimizable: true,
     maximizable: true
@@ -809,7 +805,13 @@ const isGatewayInstalled = (output: string) => {
 };
 
 const isGatewayRunning = (output: string) => {
-  return output.includes('Service: LaunchAgent (loaded)') || output.toLowerCase().includes('runtime: running');
+  const normalized = output.toLowerCase();
+  return (
+    normalized.includes('service: launchagent (loaded)') ||
+    normalized.includes('runtime: running') ||
+    normalized.includes('runtime: active') ||
+    normalized.includes('active (running)')
+  );
 };
 
 const emitCommandOutput = (event: Electron.IpcMainInvokeEvent, output: string) => {
@@ -818,6 +820,71 @@ const emitCommandOutput = (event: Electron.IpcMainInvokeEvent, output: string) =
     .map((line) => line.trimEnd())
     .filter(Boolean)
     .forEach((line) => event.sender.send('service-log', line));
+};
+
+const normalizeDownloadedConfig = (payload: any) => {
+  const source = payload?.config && typeof payload.config === 'object' ? payload.config : payload;
+  const aiInput = source?.ai && typeof source.ai === 'object'
+    ? source.ai
+    : {
+        provider: typeof source?.provider === 'string' ? source.provider : '',
+        apiKey: typeof source?.apiKey === 'string' ? source.apiKey : '',
+      };
+  const ai = normalizeAiSetup(aiInput);
+  const workspace = typeof source?.workspace === 'string' && source.workspace.trim()
+    ? source.workspace.trim()
+    : '~/.openclaw/workspace';
+  const channelsInput = source?.channels && typeof source.channels === 'object' ? source.channels : {};
+  const channels: Record<string, ChannelSetupDraft> = {};
+
+  for (const channelId of SUPPORTED_CHANNELS) {
+    const draft = channelsInput[channelId];
+    if (typeof draft === 'boolean') {
+      channels[channelId] = { enabled: draft, values: {} };
+      continue;
+    }
+    channels[channelId] = {
+      enabled: Boolean(draft?.enabled),
+      values: draft?.values && typeof draft.values === 'object' ? draft.values : {},
+    };
+  }
+
+  return { ai, workspace, channels };
+};
+
+const writeConfigSnapshot = async (config: { ai: AISetup; workspace: string; channels: Record<string, ChannelSetupDraft> }) => {
+  const configDir = path.dirname(getConfigPath());
+  await fs.mkdir(configDir, { recursive: true });
+  await fs.writeFile(getUiConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
+};
+
+const applyConfigToOpenClaw = async (config: { ai: AISetup; workspace: string; channels: Record<string, ChannelSetupDraft> }) => {
+  await backupInvalidConfigIfPresent();
+  await applyOfficialOnboard(config.ai, config.workspace);
+
+  await execCommand('openclaw', ['config', 'set', 'gateway.mode', JSON.stringify('local')]);
+  await execCommand('openclaw', ['config', 'set', 'gateway.bind', JSON.stringify('loopback')]);
+  await execCommand('openclaw', ['config', 'set', 'agents.defaults.workspace', JSON.stringify(config.workspace)]);
+
+  const selectedChannels = normalizeChannels(config.channels || {});
+  for (const channelId of SUPPORTED_CHANNELS) {
+    await applyChannelDraft(channelId, selectedChannels.get(channelId) || { enabled: false, values: {} });
+  }
+
+  await execCommand('openclaw', ['config', 'validate']);
+};
+
+const tryRecoverMacLaunchAgent = async (event: Electron.IpcMainInvokeEvent) => {
+  if (process.platform !== 'darwin') return;
+  const uid = process.getuid?.() || Number(process.env.UID || 0);
+  if (!uid) return;
+  const plistPath = path.join(os.homedir(), 'Library', 'LaunchAgents', 'ai.openclaw.gateway.plist');
+  const domain = `gui/${uid}`;
+
+  event.sender.send('service-log', 'Gateway not running after start. Attempting launchctl recovery...');
+  await execCommand('launchctl', ['bootout', domain, 'ai.openclaw.gateway']).catch(() => undefined);
+  await execCommand('launchctl', ['bootstrap', domain, plistPath], 30000);
+  await execCommand('launchctl', ['kickstart', '-k', `${domain}/ai.openclaw.gateway`], 30000);
 };
 
 const applyChannelDraft = async (channelId: (typeof SUPPORTED_CHANNELS)[number], draft: ChannelSetupDraft) => {
@@ -896,31 +963,41 @@ ipcMain.handle('read-config', async () => {
 // Write config
 ipcMain.handle('write-config', async (_, config: any) => {
   try {
-    // Persist UI snapshot for ClawOne display/reload.
-    const configDir = path.dirname(getConfigPath());
-    await fs.mkdir(configDir, { recursive: true });
-    const normalizedAi = normalizeAiSetup(config?.ai);
     const normalizedConfig = {
-      ai: normalizedAi,
+      ai: normalizeAiSetup(config?.ai),
       workspace: typeof config?.workspace === 'string' ? config.workspace : '~/.openclaw/workspace',
       channels: config?.channels || {},
     };
-    await fs.writeFile(getUiConfigPath(), JSON.stringify(normalizedConfig, null, 2), 'utf-8');
+    await writeConfigSnapshot(normalizedConfig);
+    await applyConfigToOpenClaw(normalizedConfig);
 
-    const workspace = normalizedConfig.workspace;
-    await backupInvalidConfigIfPresent();
-    await applyOfficialOnboard(normalizedAi, workspace);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
 
-    await execCommand('openclaw', ['config', 'set', 'gateway.mode', JSON.stringify('local')]);
-    await execCommand('openclaw', ['config', 'set', 'gateway.bind', JSON.stringify('loopback')]);
-    await execCommand('openclaw', ['config', 'set', 'agents.defaults.workspace', JSON.stringify(workspace)]);
-
-    const selectedChannels = normalizeChannels(normalizedConfig.channels || {});
-    for (const channelId of SUPPORTED_CHANNELS) {
-      await applyChannelDraft(channelId, selectedChannels.get(channelId) || { enabled: false, values: {} });
+ipcMain.handle('download-online-config', async (_, sourceUrl: string) => {
+  try {
+    if (!sourceUrl || !/^https?:\/\//i.test(sourceUrl.trim())) {
+      throw new Error('Please provide a valid http(s) URL.');
     }
 
-    await execCommand('openclaw', ['config', 'validate']);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(sourceUrl.trim(), {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
+
+    if (!response.ok) {
+      throw new Error(`Download failed with status ${response.status}.`);
+    }
+
+    const payload = await response.json();
+    const normalizedConfig = normalizeDownloadedConfig(payload);
+    await writeConfigSnapshot(normalizedConfig);
+    await applyConfigToOpenClaw(normalizedConfig);
 
     return { success: true };
   } catch (error) {
@@ -967,7 +1044,18 @@ ipcMain.handle('start-openclaw', async (event) => {
     emitCommandOutput(event, statusAfter.stdout);
 
     if (!isGatewayRunning(statusAfter.stdout)) {
-      throw new Error('Gateway service did not enter a running state. Check the logs above.');
+      await tryRecoverMacLaunchAgent(event).catch((error) => {
+        event.sender.send('service-log', `launchctl recovery skipped: ${(error as Error).message}`);
+      });
+      const retryStart = await execCommand('openclaw', ['gateway', 'start'], 30000);
+      emitCommandOutput(event, retryStart.stdout);
+      emitCommandOutput(event, retryStart.stderr);
+      const retryStatus = await execCommand('openclaw', ['gateway', 'status'], 30000);
+      emitCommandOutput(event, retryStatus.stdout);
+
+      if (!isGatewayRunning(retryStatus.stdout)) {
+        throw new Error('Gateway service did not enter a running state. Check the logs above.');
+      }
     }
 
     return { success: true };
@@ -981,6 +1069,36 @@ ipcMain.handle('start-openclaw', async (event) => {
 ipcMain.handle('stop-openclaw', async () => {
   try {
     await execCommand('openclaw', ['gateway', 'stop']);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('uninstall-openclaw', async (event) => {
+  try {
+    event.sender.send('service-log', 'Stopping OpenClaw gateway service before uninstall...');
+    await execCommand('openclaw', ['gateway', 'stop'], 30000).catch(() => undefined);
+    await execCommand('openclaw', ['gateway', 'uninstall'], 30000).catch(() => undefined);
+
+    const npmPath = await findCommandWithWhich('npm').catch(() => null) || 'npm';
+    const env = getShellEnv();
+    const loginPath = await getLoginShellPath().catch(() => '');
+    if (loginPath) env.PATH = loginPath;
+
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawnCommand(npmPath, ['uninstall', '-g', 'openclaw'], env);
+      proc.stdout?.on('data', (data) => event.sender.send('service-log', data.toString()));
+      proc.stderr?.on('data', (data) => event.sender.send('service-log', data.toString()));
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(`Uninstall failed with code ${code}`));
+      });
+    });
+
     return { success: true };
   } catch (error) {
     return { success: false, error: (error as Error).message };

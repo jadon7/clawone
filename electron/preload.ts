@@ -25,7 +25,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Service management
   startOpenClaw: () => ipcRenderer.invoke('start-openclaw'),
   stopOpenClaw: () => ipcRenderer.invoke('stop-openclaw'),
+  uninstallOpenClaw: () => ipcRenderer.invoke('uninstall-openclaw'),
   getServiceStatus: () => ipcRenderer.invoke('get-service-status'),
+  downloadOnlineConfig: (sourceUrl: string) => ipcRenderer.invoke('download-online-config', sourceUrl),
   onServiceLog: (callback: (log: string) => void) => {
     ipcRenderer.on('service-log', (_, log) => callback(log));
   },

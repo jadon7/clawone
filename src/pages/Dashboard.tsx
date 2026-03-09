@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OpenClawConfig, Page } from '../types';
 import { getChannelName, getEnabledChannels } from '../channelCatalog';
@@ -13,8 +13,9 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
   const [serviceRunning, setServiceRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [checking, setChecking] = useState(false);
+  const [downloadingConfig, setDownloadingConfig] = useState(false);
+  const [uninstalling, setUninstalling] = useState(false);
 
-  // Update state
   const [updateChecking, setUpdateChecking] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<any>(null);
@@ -22,16 +23,16 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
   const [updateDownloaded, setUpdateDownloaded] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [updateError, setUpdateError] = useState<string | null>(null);
+
   const enabledChannels = getEnabledChannels(config.channels).map((channelId) => getChannelName(channelId, i18n.language));
 
   useEffect(() => {
     checkStatus();
 
     window.electronAPI.onServiceLog((log: string) => {
-      setLogs(prev => [...prev, log]);
+      setLogs((prev) => [...prev, log]);
     });
 
-    // Setup update listeners
     window.electronAPI.onUpdateChecking(() => {
       setUpdateChecking(true);
       setUpdateError(null);
@@ -70,7 +71,7 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
     try {
       const status = await window.electronAPI.getServiceStatus();
       setServiceRunning(status.running);
-    } catch (error) {
+    } catch {
       setServiceRunning(false);
     } finally {
       setChecking(false);
@@ -82,9 +83,9 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
     try {
       await window.electronAPI.startOpenClaw();
       setServiceRunning(true);
-      setLogs(prev => [...prev, t('dashboard.startSuccess')]);
+      setLogs((prev) => [...prev, t('dashboard.startSuccess')]);
     } catch (error) {
-      setLogs(prev => [...prev, `Error: ${(error as Error).message}`]);
+      setLogs((prev) => [...prev, `Error: ${(error as Error).message}`]);
     }
   };
 
@@ -92,9 +93,51 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
     try {
       await window.electronAPI.stopOpenClaw();
       setServiceRunning(false);
-      setLogs(prev => [...prev, t('dashboard.stopSuccess')]);
+      setLogs((prev) => [...prev, t('dashboard.stopSuccess')]);
     } catch (error) {
-      setLogs(prev => [...prev, `Error: ${(error as Error).message}`]);
+      setLogs((prev) => [...prev, `Error: ${(error as Error).message}`]);
+    }
+  };
+
+  const uninstallOpenClaw = async () => {
+    const ok = window.confirm(t('dashboard.confirmUninstall'));
+    if (!ok) return;
+
+    setUninstalling(true);
+    setLogs((prev) => [...prev, t('dashboard.uninstalling')]);
+    try {
+      const result = await window.electronAPI.uninstallOpenClaw();
+      if (!result.success) {
+        setLogs((prev) => [...prev, `Error: ${result.error || 'Uninstall failed'}`]);
+        return;
+      }
+      setServiceRunning(false);
+      setLogs((prev) => [...prev, t('dashboard.uninstallSuccess')]);
+    } catch (error) {
+      setLogs((prev) => [...prev, `Error: ${(error as Error).message}`]);
+    } finally {
+      setUninstalling(false);
+    }
+  };
+
+  const downloadOnlineConfig = async () => {
+    const sourceUrl = window.prompt(t('dashboard.configUrlPrompt'));
+    if (!sourceUrl?.trim()) return;
+
+    setDownloadingConfig(true);
+    setLogs((prev) => [...prev, `${t('dashboard.downloadingConfig')} ${sourceUrl.trim()}`]);
+
+    try {
+      const result = await window.electronAPI.downloadOnlineConfig(sourceUrl.trim());
+      if (!result.success) {
+        setLogs((prev) => [...prev, `Error: ${result.error || 'Download failed'}`]);
+        return;
+      }
+      setLogs((prev) => [...prev, t('dashboard.downloadConfigSuccess')]);
+    } catch (error) {
+      setLogs((prev) => [...prev, `Error: ${(error as Error).message}`]);
+    } finally {
+      setDownloadingConfig(false);
     }
   };
 
@@ -125,18 +168,22 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
   };
 
   return (
-    <div className="page">
-      <h1>{t('dashboard.title')}</h1>
-      <p>{t('dashboard.description')}</p>
+    <div className="page dashboard-page">
+      <div className="dashboard-banner">
+        <div>
+          <h1>{t('dashboard.title')}</h1>
+          <p>{t('dashboard.description')}</p>
+        </div>
+        <div className={`dashboard-status-pill ${serviceRunning ? 'running' : 'stopped'}`}>
+          <span className="status-dot" />
+          {serviceRunning ? t('dashboard.running') : t('dashboard.stopped')}
+        </div>
+      </div>
 
       <div className="dashboard-grid">
-        <div className="dashboard-card">
+        <div className="dashboard-card service-card">
           <h3>{t('dashboard.serviceStatus')}</h3>
-          <div className="service-status">
-            <div className={`status-indicator ${serviceRunning ? 'status-running' : 'status-stopped'}`}></div>
-            <span>{serviceRunning ? t('dashboard.running') : t('dashboard.stopped')}</span>
-          </div>
-          <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+          <div className="service-controls">
             {!serviceRunning ? (
               <button className="button" onClick={startService}>
                 {t('dashboard.startService')}
@@ -146,11 +193,7 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
                 {t('dashboard.stopService')}
               </button>
             )}
-            <button
-              className="button button-secondary"
-              onClick={checkStatus}
-              disabled={checking}
-            >
+            <button className="button button-secondary" onClick={checkStatus} disabled={checking}>
               {t('dashboard.refresh')}
             </button>
           </div>
@@ -158,104 +201,61 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
 
         <div className="dashboard-card">
           <h3>{t('dashboard.configuration')}</h3>
-          <div style={{ fontSize: '14px', color: '#4a5568' }}>
-            <p><strong>{t('dashboard.provider')}:</strong> {config.ai?.provider || t('dashboard.none')}</p>
-            <p><strong>{t('dashboard.workspace')}:</strong> {config.workspace}</p>
-            <p>
-              <strong>{t('dashboard.channels')}:</strong>{' '}
-              {enabledChannels.join(', ') || t('dashboard.none')}
-            </p>
+          <div className="config-row">
+            <span>{t('dashboard.provider')}</span>
+            <strong>{config.ai?.provider || t('dashboard.none')}</strong>
+          </div>
+          <div className="config-row">
+            <span>{t('dashboard.workspace')}</span>
+            <strong>{config.workspace}</strong>
+          </div>
+          <div className="config-row">
+            <span>{t('dashboard.channels')}</span>
+            <strong>{enabledChannels.join(', ') || t('dashboard.none')}</strong>
           </div>
         </div>
       </div>
 
-      {/* Quick actions */}
-      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
-        <button
-          className="button"
-          onClick={() => onNavigate('plugin-manager')}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          🔌 Plugin Manager
+      <div className="dashboard-quick-actions">
+        <button className="button" onClick={() => onNavigate('plugin-manager')}>
+          Plugin Manager
         </button>
-        <button
-          className="button button-secondary"
-          onClick={() => alert(t('dashboard.downloadOnlineConfigComingSoon'))}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          ☁️ {t('dashboard.downloadOnlineConfig')}
+        <button className="button button-secondary" onClick={downloadOnlineConfig} disabled={downloadingConfig}>
+          {downloadingConfig ? t('dashboard.downloadingConfig') : t('dashboard.downloadOnlineConfig')}
         </button>
-        <button
-          className="button button-secondary"
-          onClick={checkForUpdates}
-          disabled={updateChecking}
-        >
-          {updateChecking ? 'Checking for updates...' : '🔄 Check for Updates'}
+        <button className="button button-secondary" onClick={checkForUpdates} disabled={updateChecking}>
+          {updateChecking ? t('dashboard.checkingUpdates') : t('dashboard.checkUpdates')}
+        </button>
+        <button className="button button-danger" onClick={uninstallOpenClaw} disabled={uninstalling}>
+          {uninstalling ? t('dashboard.uninstalling') : t('dashboard.uninstallOpenClaw')}
         </button>
       </div>
 
-      {/* Update notification card */}
       {(updateAvailable || updateDownloaded || updateError) && (
         <div className="dashboard-card" style={{ marginBottom: '24px' }}>
-          <h3>🔄 Software Update</h3>
-          {updateError && (
-            <div style={{
-              background: '#fff5f5',
-              border: '2px solid #fc8181',
-              borderRadius: '8px',
-              padding: '12px',
-              marginBottom: '12px'
-            }}>
-              <strong style={{ color: '#c53030' }}>Update Error</strong>
-              <p style={{ color: '#742a2a', marginTop: '4px', marginBottom: '0', fontSize: '14px' }}>
-                {updateError}
-              </p>
-            </div>
-          )}
+          <h3>{t('dashboard.softwareUpdate')}</h3>
+          {updateError && <p style={{ color: '#8a2f26' }}>{updateError}</p>}
 
           {updateAvailable && !updateDownloaded && (
-            <div style={{
-              background: '#ebf8ff',
-              border: '2px solid #4299e1',
-              borderRadius: '8px',
-              padding: '12px',
-              marginBottom: '12px'
-            }}>
-              <strong style={{ color: '#2c5282' }}>New Version Available</strong>
-              <p style={{ color: '#2c5282', marginTop: '4px', marginBottom: '8px', fontSize: '14px' }}>
-                Version {updateInfo?.version} is available for download.
-              </p>
+            <div>
+              <p>{t('dashboard.newVersion')}: {updateInfo?.version}</p>
               {updateDownloading ? (
                 <div>
-                  <div style={{ marginBottom: '8px', fontSize: '14px', color: '#2c5282' }}>
-                    Downloading: {downloadProgress}%
-                  </div>
+                  <div style={{ marginBottom: '8px' }}>{t('dashboard.downloadingProgress')} {downloadProgress}%</div>
                   <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${downloadProgress}%` }}></div>
+                    <div className="progress-fill" style={{ width: `${downloadProgress}%` }} />
                   </div>
                 </div>
               ) : (
-                <button className="button" onClick={downloadUpdate}>
-                  Download Update
-                </button>
+                <button className="button" onClick={downloadUpdate}>{t('dashboard.downloadUpdate')}</button>
               )}
             </div>
           )}
 
           {updateDownloaded && (
-            <div style={{
-              background: '#f0fff4',
-              border: '2px solid #48bb78',
-              borderRadius: '8px',
-              padding: '12px'
-            }}>
-              <strong style={{ color: '#22543d' }}>Update Ready</strong>
-              <p style={{ color: '#276749', marginTop: '4px', marginBottom: '8px', fontSize: '14px' }}>
-                Version {updateInfo?.version} has been downloaded and is ready to install.
-              </p>
-              <button className="button" onClick={installUpdate}>
-                Restart & Install
-              </button>
+            <div>
+              <p>{t('dashboard.updateReady')} {updateInfo?.version}</p>
+              <button className="button" onClick={installUpdate}>{t('dashboard.restartInstall')}</button>
             </div>
           )}
         </div>
@@ -263,7 +263,7 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
 
       <div className="dashboard-card" style={{ marginBottom: '24px' }}>
         <h3>{t('dashboard.serviceLogs')}</h3>
-        <div className="log-container" style={{ maxHeight: '200px' }}>
+        <div className="log-container" style={{ maxHeight: '240px' }}>
           {logs.length === 0 ? (
             <div style={{ color: '#718096' }}>{t('dashboard.noLogs')}</div>
           ) : (
@@ -276,17 +276,10 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      <div
-        style={{
-          background: '#f0fff4',
-          border: '2px solid #48bb78',
-          borderRadius: '8px',
-          padding: '16px'
-        }}
-      >
-        <strong style={{ color: '#22543d' }}>{t('dashboard.setupComplete')}</strong>
-        <p style={{ color: '#276749', marginTop: '8px', marginBottom: '0' }}>
-          {t('dashboard.setupCompleteInfo')} <code style={{ background: '#c6f6d5', padding: '2px 6px', borderRadius: '4px' }}>openclaw start</code> {t('dashboard.fromTerminal')}
+      <div className="dashboard-tip">
+        <strong>{t('dashboard.setupComplete')}</strong>
+        <p>
+          {t('dashboard.setupCompleteInfo')} <code>openclaw gateway start</code> {t('dashboard.fromTerminal')}
         </p>
       </div>
     </div>

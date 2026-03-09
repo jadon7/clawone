@@ -11,7 +11,9 @@ export interface ElectronAPI {
   testApiConnection: (config: AISetup) => Promise<{ success: boolean; message: string; details?: string }>;
   startOpenClaw: () => Promise<{ success: boolean }>;
   stopOpenClaw: () => Promise<{ success: boolean; error?: string }>;
+  uninstallOpenClaw: () => Promise<{ success: boolean; error?: string }>;
   getServiceStatus: () => Promise<{ running: boolean; output: string }>;
+  downloadOnlineConfig: (sourceUrl: string) => Promise<{ success: boolean; error?: string }>;
   onServiceLog: (callback: (log: string) => void) => void;
   checkForUpdates: () => Promise<{ success: boolean; updateInfo?: any; error?: string }>;
   downloadUpdate: () => Promise<{ success: boolean; error?: string }>;

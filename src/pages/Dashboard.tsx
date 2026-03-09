@@ -169,20 +169,32 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
 
   return (
     <div className="page dashboard-page">
-      <div className="dashboard-banner">
-        <div>
+      <header className="dashboard-topbar">
+        <div className="dashboard-topbar-copy">
           <h1>{t('dashboard.title')}</h1>
           <p>{t('dashboard.description')}</p>
         </div>
+        <div className="dashboard-workspace-chip">
+          <span>{t('dashboard.workspace')}</span>
+          <code>{config.workspace}</code>
+        </div>
+      </header>
+
+      <div className="dashboard-banner">
         <div className={`dashboard-status-pill ${serviceRunning ? 'running' : 'stopped'}`}>
           <span className="status-dot" />
           {serviceRunning ? t('dashboard.running') : t('dashboard.stopped')}
         </div>
+        <p>
+          <strong>{t('dashboard.setupComplete')}</strong> {t('dashboard.setupCompleteInfo')} <code>openclaw gateway start</code>{' '}
+          {t('dashboard.fromTerminal')}
+        </p>
       </div>
 
       <div className="dashboard-grid">
-        <div className="dashboard-card service-card">
-          <h3>{t('dashboard.serviceStatus')}</h3>
+        <section className="dashboard-card service-card">
+          <p className="dashboard-card-kicker">{t('dashboard.serviceStatus')}</p>
+          <h3>{serviceRunning ? t('dashboard.running') : t('dashboard.stopped')}</h3>
           <div className="service-controls">
             {!serviceRunning ? (
               <button className="button" onClick={startService}>
@@ -197,9 +209,10 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
               {t('dashboard.refresh')}
             </button>
           </div>
-        </div>
+        </section>
 
-        <div className="dashboard-card">
+        <section className="dashboard-card">
+          <p className="dashboard-card-kicker">{t('dashboard.configuration')}</p>
           <h3>{t('dashboard.configuration')}</h3>
           <div className="config-row">
             <span>{t('dashboard.provider')}</span>
@@ -213,20 +226,20 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
             <span>{t('dashboard.channels')}</span>
             <strong>{enabledChannels.join(', ') || t('dashboard.none')}</strong>
           </div>
-        </div>
+        </section>
       </div>
 
-      <div className="dashboard-quick-actions">
-        <button className="button" onClick={() => onNavigate('plugin-manager')}>
+      <div className="dashboard-quick-actions dashboard-action-grid">
+        <button className="button dashboard-action-card" onClick={() => onNavigate('plugin-manager')}>
           Plugin Manager
         </button>
-        <button className="button button-secondary" onClick={downloadOnlineConfig} disabled={downloadingConfig}>
+        <button className="button button-secondary dashboard-action-card" onClick={downloadOnlineConfig} disabled={downloadingConfig}>
           {downloadingConfig ? t('dashboard.downloadingConfig') : t('dashboard.downloadOnlineConfig')}
         </button>
-        <button className="button button-secondary" onClick={checkForUpdates} disabled={updateChecking}>
+        <button className="button button-secondary dashboard-action-card" onClick={checkForUpdates} disabled={updateChecking}>
           {updateChecking ? t('dashboard.checkingUpdates') : t('dashboard.checkUpdates')}
         </button>
-        <button className="button button-danger" onClick={uninstallOpenClaw} disabled={uninstalling}>
+        <button className="button button-danger dashboard-action-card" onClick={uninstallOpenClaw} disabled={uninstalling}>
           {uninstalling ? t('dashboard.uninstalling') : t('dashboard.uninstallOpenClaw')}
         </button>
       </div>
@@ -261,7 +274,7 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
         </div>
       )}
 
-      <div className="dashboard-card" style={{ marginBottom: '24px' }}>
+      <div className="dashboard-card dashboard-log-card" style={{ marginBottom: '24px' }}>
         <h3>{t('dashboard.serviceLogs')}</h3>
         <div className="log-container" style={{ maxHeight: '240px' }}>
           {logs.length === 0 ? (
@@ -274,13 +287,6 @@ export default function Dashboard({ config, onNavigate }: DashboardProps) {
             ))
           )}
         </div>
-      </div>
-
-      <div className="dashboard-tip">
-        <strong>{t('dashboard.setupComplete')}</strong>
-        <p>
-          {t('dashboard.setupCompleteInfo')} <code>openclaw gateway start</code> {t('dashboard.fromTerminal')}
-        </p>
       </div>
     </div>
   );

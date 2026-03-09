@@ -102,6 +102,40 @@ const CHANNEL_ADD_FLAGS: Partial<Record<(typeof SUPPORTED_CHANNELS)[number], Rec
   },
 };
 
+let supportedChannelAddTargets: Set<string> | null = null;
+
+const parseChannelAddTargets = (helpText: string): Set<string> => {
+  const inlineMatch = helpText.match(/--channel\s+[^\n]*\(([^)]+)\)/);
+  if (!inlineMatch?.[1]) return new Set();
+  return new Set(
+    inlineMatch[1]
+      .split('|')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  );
+};
+
+const getSupportedChannelAddTargets = async (): Promise<Set<string> | null> => {
+  if (supportedChannelAddTargets) return supportedChannelAddTargets;
+
+  try {
+    const { stdout } = await execCommand('openclaw', ['channels', 'add', '--help'], 15000);
+    const parsedTargets = parseChannelAddTargets(stdout);
+    if (parsedTargets.size > 0) {
+      supportedChannelAddTargets = parsedTargets;
+    }
+  } catch {
+    // Older or custom OpenClaw builds may not expose help in the same format.
+  }
+
+  return supportedChannelAddTargets;
+};
+
+const isSkippableChannelAddError = (error: unknown): boolean => {
+  const message = String((error as Error)?.message || '');
+  return /Unknown channel|Unknown option|unknown option|Invalid value for .*--channel/i.test(message);
+};
+
 // Get enriched PATH for finding tools installed via nvm, homebrew, volta, etc.
 const getShellEnv = (): NodeJS.ProcessEnv => {
   const env = { ...process.env };
@@ -908,7 +942,21 @@ const applyChannelDraft = async (channelId: (typeof SUPPORTED_CHANNELS)[number],
     }
 
     if (hasSetupValues) {
-      await execCommand('openclaw', args, 30000);
+      const supportedTargets = await getSupportedChannelAddTargets();
+      const isSupportedByCli = !supportedTargets || supportedTargets.has(channelId);
+
+      if (!isSupportedByCli) {
+        console.warn(`[channel] Skipping openclaw channels add for unsupported channel "${channelId}" in current CLI.`);
+      } else {
+        try {
+          await execCommand('openclaw', args, 30000);
+        } catch (error) {
+          if (!isSkippableChannelAddError(error)) {
+            throw error;
+          }
+          console.warn(`[channel] Non-blocking channel add failure for "${channelId}": ${(error as Error).message}`);
+        }
+      }
     }
   }
 

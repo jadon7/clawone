@@ -498,31 +498,71 @@ textarea {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: minmax(300px, 1.35fr) minmax(260px, 1fr);
+  gap: 18px;
   margin-bottom: 24px;
 }
 
 .dashboard-card {
-  background: white;
-  padding: 22px;
-  border-radius: 20px;
-  border: 1px solid rgba(23, 35, 45, 0.06);
+  background: #ffffff;
+  padding: 24px;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
 }
 
 .dashboard-page {
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f8 100%);
+  border: 1px solid #dbe4ee;
+}
+
+.dashboard-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.dashboard-topbar-copy p {
+  margin-bottom: 0;
+}
+
+.dashboard-workspace-chip {
+  border: 1px solid #d2dde9;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 10px 12px;
+  min-width: 240px;
+}
+
+.dashboard-workspace-chip span {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.dashboard-workspace-chip code {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', 'Menlo', monospace;
+  color: #0f172a;
+  font-size: 13px;
+  word-break: break-all;
 }
 
 .dashboard-banner {
-  border: 1px solid #cbd5e1;
-  border-radius: 20px;
-  padding: 20px 24px;
+  border: 1px solid #9adbcf;
+  border-left: 6px solid #0f766e;
+  border-radius: 16px;
+  padding: 14px 18px;
   margin-bottom: 20px;
-  background: #ffffff;
+  background: #ecfdf5;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
 }
 
@@ -539,12 +579,12 @@ textarea {
 
 .dashboard-status-pill.running {
   color: #065f46;
-  background: #ecfdf5;
+  background: #dcfce7;
 }
 
 .dashboard-status-pill.stopped {
   color: #9f1239;
-  background: #fff1f2;
+  background: #ffe4e6;
 }
 
 .status-dot {
@@ -559,6 +599,19 @@ textarea {
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 24px;
+}
+
+.dashboard-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-action-card {
+  justify-content: flex-start;
+  text-align: left;
+  border-radius: 16px;
+  min-height: 54px;
 }
 
 .button-danger {
@@ -595,23 +648,26 @@ textarea {
   word-break: break-word;
 }
 
+.dashboard-card-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #64748b;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
 .service-card .service-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 16px;
 }
 
-.dashboard-tip {
-  background: #ecfdf5;
-  border: 1px solid #86efac;
-  border-radius: 12px;
-  padding: 14px 16px;
-}
-
-.dashboard-tip code {
-  background: #dcfce7;
-  border-radius: 6px;
-  padding: 2px 6px;
+.dashboard-log-card .log-container {
+  background: #020617;
+  border: 1px solid #1e293b;
+  box-shadow: inset 0 0 0 1px rgba(30, 41, 59, 0.3);
 }
 
 .channel-flow {
@@ -841,6 +897,20 @@ textarea {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+
+  .dashboard-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-workspace-chip {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .dashboard-action-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -879,6 +949,6 @@ textarea {
 
   .dashboard-banner {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
   }
 }

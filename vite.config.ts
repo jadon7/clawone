@@ -1,17 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import electron from 'vite-plugin-electron';
-import renderer from 'vite-plugin-electron-renderer';
+import electron from 'vite-plugin-electron/simple';
 
 export default defineConfig({
   plugins: [
     react(),
-    electron([
-      {
+    electron({
+      main: {
         entry: 'electron/main.ts',
-        onstart(options) {
-          options.startup();
-        },
         vite: {
           build: {
             outDir: 'dist-electron',
@@ -21,19 +17,16 @@ export default defineConfig({
           }
         }
       },
-      {
-        entry: 'electron/preload.ts',
-        onstart(options) {
-          options.reload();
-        },
+      preload: {
+        input: 'electron/preload.ts',
         vite: {
           build: {
             outDir: 'dist-electron'
           }
         }
-      }
-    ]),
-    renderer()
+      },
+      renderer: {}
+    })
   ],
   server: {
     port: 5173

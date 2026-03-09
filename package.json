@@ -6,11 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc && vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "tsc && vite build && electron-builder",
-    "publish": "tsc && vite build && electron-builder --publish always"
+    "electron:build": "tsc && vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
+    "publish": "tsc && vite build && GH_TOKEN=\"${GH_TOKEN:-$(gh auth token)}\" CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish always"
   },
   "keywords": [
     "clawone",

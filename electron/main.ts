@@ -180,15 +180,15 @@ const execCommand = async (command: string, args: string[] = [], timeoutMs: numb
   }
 };
 
-// Helper function to spawn process with cross-platform support
-const spawnCommand = (command: string, args: string[] = []) => {
+// Helper function to spawn process with cross-platform support and enriched PATH
+const spawnCommand = (command: string, args: string[] = [], env?: NodeJS.ProcessEnv) => {
   const isWindows = process.platform === 'win32';
+  const spawnEnv = env || getShellEnv();
 
   if (isWindows) {
-    // On Windows, use cmd.exe to execute commands
-    return spawn('cmd.exe', ['/c', command, ...args], { shell: true });
+    return spawn('cmd.exe', ['/c', command, ...args], { shell: true, env: spawnEnv });
   } else {
-    return spawn(command, args, { shell: true });
+    return spawn(command, args, { shell: true, env: spawnEnv });
   }
 };
 
@@ -350,18 +350,28 @@ ipcMain.handle('check-git', async () => {
 
 // Install OpenClaw
 ipcMain.handle('install-openclaw', async (event) => {
+  // Resolve npm path and env before spawning to avoid code 127 in Electron's restricted PATH
+  const npmPath = await findCommandWithWhich('npm').catch(() => null) || 'npm';
+  const env = getShellEnv();
+
+  // Try to get login shell PATH for the most accurate environment
+  try {
+    const loginPath = await getLoginShellPath();
+    if (loginPath) env.PATH = loginPath;
+  } catch {}
+
   return new Promise((resolve, reject) => {
-    const process = spawnCommand('npm', ['install', '-g', 'openclaw@latest']);
+    const proc = spawnCommand(npmPath, ['install', '-g', 'openclaw@latest'], env);
 
-    process.stdout?.on('data', (data) => {
+    proc.stdout?.on('data', (data) => {
       event.sender.send('install-log', data.toString());
     });
 
-    process.stderr?.on('data', (data) => {
+    proc.stderr?.on('data', (data) => {
       event.sender.send('install-log', data.toString());
     });
 
-    process.on('close', (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         resolve({ success: true });
       } else {
@@ -479,18 +489,25 @@ ipcMain.handle('install-update', () => {
 
 // Plugin management IPC handlers
 ipcMain.handle('install-plugin', async (event, pluginId: string) => {
+  const npmPath = await findCommandWithWhich('npm').catch(() => null) || 'npm';
+  const env = getShellEnv();
+  try {
+    const loginPath = await getLoginShellPath();
+    if (loginPath) env.PATH = loginPath;
+  } catch {}
+
   return new Promise((resolve) => {
-    const process = spawnCommand('npm', ['install', '-g', `@openclaw/plugin-${pluginId}@latest`]);
+    const proc = spawnCommand(npmPath, ['install', '-g', `@openclaw/plugin-${pluginId}@latest`], env);
 
-    process.stdout?.on('data', (data) => {
+    proc.stdout?.on('data', (data) => {
       event.sender.send('plugin-log', data.toString());
     });
 
-    process.stderr?.on('data', (data) => {
+    proc.stderr?.on('data', (data) => {
       event.sender.send('plugin-log', data.toString());
     });
 
-    process.on('close', (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         resolve({ success: true });
       } else {
@@ -501,18 +518,25 @@ ipcMain.handle('install-plugin', async (event, pluginId: string) => {
 });
 
 ipcMain.handle('uninstall-plugin', async (event, pluginId: string) => {
+  const npmPath = await findCommandWithWhich('npm').catch(() => null) || 'npm';
+  const env = getShellEnv();
+  try {
+    const loginPath = await getLoginShellPath();
+    if (loginPath) env.PATH = loginPath;
+  } catch {}
+
   return new Promise((resolve) => {
-    const process = spawnCommand('npm', ['uninstall', '-g', `@openclaw/plugin-${pluginId}`]);
+    const proc = spawnCommand(npmPath, ['uninstall', '-g', `@openclaw/plugin-${pluginId}`], env);
 
-    process.stdout?.on('data', (data) => {
+    proc.stdout?.on('data', (data) => {
       event.sender.send('plugin-log', data.toString());
     });
 
-    process.stderr?.on('data', (data) => {
+    proc.stderr?.on('data', (data) => {
       event.sender.send('plugin-log', data.toString());
     });
 
-    process.on('close', (code) => {
+    proc.on('close', (code) => {
       if (code === 0) {
         resolve({ success: true });
       } else {

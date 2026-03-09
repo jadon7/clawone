@@ -53,11 +53,10 @@ export default function ConfigStep2({ config, updateConfig, onNext, onBack }: Co
   };
 
   const canContinue = () => {
-    if (config.ai?.provider === 'ollama') return true;
     return apiKey.length > 0;
   };
 
-  const needsApiKey = config.ai?.provider !== 'ollama';
+  const needsApiKey = true;
 
   return (
     <div className="page">

@@ -10,11 +10,11 @@ interface ConfigStep1Props {
 export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep1Props) {
   const { t } = useTranslation();
   const providers = [
-    { value: 'anthropic', label: t('config.step1.providers.anthropic') },
-    { value: 'openai', label: t('config.step1.providers.openai') },
-    { value: 'ollama', label: t('config.step1.providers.ollama') },
-    { value: 'azure', label: t('config.step1.providers.azure') },
-    { value: 'google', label: t('config.step1.providers.google') }
+    'openai', 'anthropic', 'chutes', 'vllm', 'minimax', 'moonshot',
+    'google', 'xai', 'mistral', 'volcengine', 'byteplus', 'openrouter',
+    'kilo', 'qwen', 'zai', 'qianfan', 'copilot', 'vercel', 'opencode-zen',
+    'xiaomi', 'synthetic', 'together', 'huggingface', 'venice', 'litellm',
+    'cloudflare', 'custom'
   ];
 
   const handleProviderChange = (provider: string) => {
@@ -52,29 +52,12 @@ export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep
         >
           <option value="">{t('config.step1.selectProvider')}</option>
           {providers.map((provider) => (
-            <option key={provider.value} value={provider.value}>
-              {provider.label}
+            <option key={provider} value={provider}>
+              {t(`config.step1.providers.${provider}`)}
             </option>
           ))}
         </select>
       </div>
-
-      {config.ai?.provider === 'ollama' && (
-        <div
-          style={{
-            background: '#ebf8ff',
-            border: '2px solid #4299e1',
-            borderRadius: '8px',
-            padding: '16px',
-            marginBottom: '24px'
-          }}
-        >
-          <strong style={{ color: '#2c5282' }}>{t('config.step1.localModel')}</strong>
-          <p style={{ color: '#2d3748', marginTop: '8px', marginBottom: '0' }}>
-            {t('config.step1.ollamaInfo')}
-          </p>
-        </div>
-      )}
 
       <div className="button-group">
         <button

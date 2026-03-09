@@ -7,6 +7,9 @@ import fs from 'fs/promises';
 import os from 'os';
 import { spawn } from 'child_process';
 import { autoUpdater } from 'electron-updater';
+import { AUTH_CATALOG, AUTH_LOOKUP } from '../src/authCatalog';
+import { CHANNEL_LOOKUP } from '../src/channelCatalog';
+import { AISetup, AuthOptionDefinition, ChannelDraftMap, Plugin } from '../src/types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +41,21 @@ const SUPPORTED_CHANNELS = [
 type ChannelSetupDraft = {
   enabled?: boolean;
   values?: Record<string, string>;
+};
+
+type ModelStatus = {
+  auth?: {
+    providers?: Array<{ provider: string }>;
+    missingProvidersInUse?: string[];
+    probes?: {
+      results?: Array<{
+        provider: string;
+        status: string;
+        latencyMs?: number;
+        error?: string;
+      }>;
+    };
+  };
 };
 
 const CHANNEL_ADD_FLAGS: Partial<Record<(typeof SUPPORTED_CHANNELS)[number], Record<string, string>>> = {
@@ -193,9 +211,15 @@ const findCommandInCommonPaths = (command: string): string | null => {
 };
 
 // Execute a command with multiple fallback strategies
-const execCommand = async (command: string, args: string[] = [], timeoutMs: number = 10000): Promise<{ stdout: string; stderr: string; resolvedPath?: string; foundAt?: string }> => {
+const execCommand = async (
+  command: string,
+  args: string[] = [],
+  timeoutMs: number = 10000,
+  envOverrides?: NodeJS.ProcessEnv,
+): Promise<{ stdout: string; stderr: string; resolvedPath?: string; foundAt?: string }> => {
   const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
   const debugInfo: string[] = [];
+  const baseEnv = { ...getShellEnv(), ...envOverrides };
 
   const runWith = (env: NodeJS.ProcessEnv, cmd?: string): Promise<{ stdout: string; stderr: string }> =>
     new Promise((resolve, reject) => {
@@ -217,8 +241,8 @@ const execCommand = async (command: string, args: string[] = [], timeoutMs: numb
     const cmdPath = await findCommandWithWhich(command);
     if (cmdPath) {
       debugInfo.push(`Found via which: ${cmdPath}`);
-      const result = await runWith(process.env, `${cmdPath} ${args.join(' ')}`);
-      return { ...result, resolvedPath: process.env.PATH, foundAt: cmdPath };
+      const result = await runWith(baseEnv, `${cmdPath} ${args.join(' ')}`);
+      return { ...result, resolvedPath: baseEnv.PATH, foundAt: cmdPath };
     }
   } catch {}
 
@@ -227,22 +251,22 @@ const execCommand = async (command: string, args: string[] = [], timeoutMs: numb
     const cmdPath = findCommandInCommonPaths(command);
     if (cmdPath) {
       debugInfo.push(`Found in common path: ${cmdPath}`);
-      const result = await runWith(process.env, `${cmdPath} ${args.join(' ')}`);
-      return { ...result, resolvedPath: process.env.PATH, foundAt: cmdPath };
+      const result = await runWith(baseEnv, `${cmdPath} ${args.join(' ')}`);
+      return { ...result, resolvedPath: baseEnv.PATH, foundAt: cmdPath };
     }
   } catch {}
 
   // Strategy 3: login shell PATH
   try {
     const loginPath = await getLoginShellPath();
-    const env = { ...process.env, PATH: loginPath };
+    const env = { ...baseEnv, PATH: loginPath };
     const result = await runWith(env);
     return { ...result, resolvedPath: loginPath, foundAt: debugInfo[0]?.replace('Found via which: ', '') };
   } catch {}
 
   // Strategy 4: enriched static PATH
   try {
-    const env = getShellEnv();
+    const env = baseEnv;
     const result = await runWith(env);
     return { ...result, resolvedPath: env.PATH };
   } catch (err) {
@@ -480,12 +504,126 @@ const normalizeChannels = (channels: Record<string, boolean | ChannelSetupDraft>
   return normalized;
 };
 
-const bootstrapValidConfig = async (workspace: string) => {
+const LEGACY_AUTH_CHOICE_BY_PROVIDER: Record<string, string> = {
+  openai: 'openai-api-key',
+  anthropic: 'anthropic-api-key',
+  google: 'gemini-api-key',
+  openrouter: 'openrouter-api-key',
+  mistral: 'mistral-api-key',
+  moonshot: 'moonshot-api-key',
+  minimax: 'minimax-api',
+  xai: 'xai-api-key',
+  zai: 'zai-api-key',
+  qianfan: 'qianfan-api-key',
+  volcengine: 'volcengine-api-key',
+  byteplus: 'byteplus-api-key',
+  kilo: 'kilocode-api-key',
+  vercel: 'ai-gateway-api-key',
+  'opencode-zen': 'opencode-zen',
+  xiaomi: 'xiaomi-api-key',
+  synthetic: 'synthetic-api-key',
+  together: 'together-api-key',
+  huggingface: 'huggingface-api-key',
+  venice: 'venice-api-key',
+  litellm: 'litellm-api-key',
+  cloudflare: 'cloudflare-ai-gateway-api-key',
+  custom: 'custom-api-key',
+};
+
+const LIST_CONFIG_FIELDS = new Set(['allowFrom', 'groupAllowFrom']);
+let cachedAuthOptions: AuthOptionDefinition[] | null = null;
+
+const parseJsonOutput = <T>(raw: string, fallback: T): T => {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const parseDelimitedList = (value: string) => (
+  value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+);
+
+const getValueByPath = (source: Record<string, unknown> | undefined, pathExpression: string) => {
+  if (!source) return undefined;
+  return pathExpression.split('.').reduce<unknown>((current, segment) => {
+    if (current && typeof current === 'object' && segment in (current as Record<string, unknown>)) {
+      return (current as Record<string, unknown>)[segment];
+    }
+    return undefined;
+  }, source);
+};
+
+const serializeFieldValue = (fieldId: string, value: string) => {
+  if (LIST_CONFIG_FIELDS.has(fieldId)) {
+    return JSON.stringify(parseDelimitedList(value));
+  }
+  return JSON.stringify(value);
+};
+
+const normalizeAiSetup = (input: Partial<AISetup> | undefined): AISetup => {
+  const rawValues = input?.values && typeof input.values === 'object' ? input.values : {};
+  const apiKey = typeof input?.apiKey === 'string' ? input.apiKey : '';
+  const values = { ...rawValues };
+  if (apiKey && !values.apiKey) {
+    values.apiKey = apiKey;
+  }
+
+  const authChoice = typeof input?.authChoice === 'string' && input.authChoice
+    ? input.authChoice
+    : LEGACY_AUTH_CHOICE_BY_PROVIDER[input?.provider || ''] || '';
+  const option = AUTH_LOOKUP[authChoice];
+
+  return {
+    authChoice,
+    provider: option?.label || input?.provider || '',
+    providerId: option?.providerId || input?.providerId,
+    values,
+    apiKey: values.apiKey || '',
+  };
+};
+
+const getAuthChoiceForProvider = (providerId: string | undefined) => {
+  if (!providerId) return '';
+  const match = AUTH_CATALOG.find((option) => option.providerId === providerId);
+  return match?.id || '';
+};
+
+const getOfficialAuthOptions = async () => {
+  if (cachedAuthOptions) return cachedAuthOptions;
+
+  try {
+    const { stdout } = await execCommand('openclaw', ['onboard', '--help']);
+    const match = stdout.match(/--auth-choice <choice>\s+Auth:\s+([^\n]+)/);
+    if (!match) {
+      cachedAuthOptions = AUTH_CATALOG;
+      return cachedAuthOptions;
+    }
+
+    const available = new Set(
+      match[1]
+        .split('|')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    );
+    cachedAuthOptions = AUTH_CATALOG.filter((option) => available.has(option.id));
+    return cachedAuthOptions;
+  } catch {
+    cachedAuthOptions = AUTH_CATALOG;
+    return cachedAuthOptions;
+  }
+};
+
+const backupInvalidConfigIfPresent = async () => {
   const configPath = getConfigPath();
 
   try {
     await execCommand('openclaw', ['config', 'validate']);
-    return;
+    return false;
   } catch {
     try {
       const rawConfig = await fs.readFile(configPath, 'utf-8');
@@ -496,8 +634,17 @@ const bootstrapValidConfig = async (workspace: string) => {
       await fs.writeFile(backupPath, rawConfig, 'utf-8');
     } catch {}
   }
+  return true;
+};
 
-  await execCommand('openclaw', [
+const buildOnboardArgs = (setup: AISetup, workspace: string) => {
+  const normalized = normalizeAiSetup(setup);
+  const option = AUTH_LOOKUP[normalized.authChoice];
+  if (!option) {
+    throw new Error('Unsupported authentication method. Re-select a provider in Step 1.');
+  }
+
+  const args = [
     'onboard',
     '--non-interactive',
     '--accept-risk',
@@ -508,14 +655,153 @@ const bootstrapValidConfig = async (workspace: string) => {
     '--workspace',
     workspace,
     '--auth-choice',
-    'skip',
+    option.id,
     '--skip-channels',
     '--skip-daemon',
     '--skip-health',
     '--skip-search',
     '--skip-skills',
     '--skip-ui',
-  ], 30000);
+  ];
+
+  for (const field of option.fields) {
+    const value = normalized.values[field.id]?.trim();
+    if (field.required && !value) {
+      throw new Error(`${field.label} is required for ${option.label}.`);
+    }
+    const flag = option.fieldFlagMap[field.id];
+    if (flag && value) {
+      args.push(flag, value);
+    }
+  }
+
+  return { args, option, normalized };
+};
+
+const getProbeEnv = (baseDir: string) => ({
+  OPENCLAW_CONFIG_PATH: path.join(baseDir, 'openclaw.json'),
+  OPENCLAW_STATE_DIR: path.join(baseDir, 'state'),
+});
+
+const getOfficialWorkspace = async () => {
+  const { stdout } = await execCommand('openclaw', ['config', 'get', 'agents.defaults.workspace']);
+  return stdout.trim() || '~/.openclaw/workspace';
+};
+
+const getOfficialChannels = async () => {
+  const { stdout } = await execCommand('openclaw', ['config', 'get', 'channels']);
+  return parseJsonOutput<Record<string, Record<string, unknown>>>(stdout, {});
+};
+
+const getOfficialModelStatus = async () => {
+  const { stdout } = await execCommand('openclaw', ['models', 'status', '--json']);
+  return parseJsonOutput<ModelStatus>(stdout, {});
+};
+
+const mergeAiSetupWithOfficial = (snapshot: Partial<AISetup> | undefined, status: ModelStatus | undefined): AISetup => {
+  const normalized = normalizeAiSetup(snapshot);
+  const detectedProvider = status?.auth?.providers?.[0]?.provider || status?.auth?.missingProvidersInUse?.[0];
+  const detectedChoice = getAuthChoiceForProvider(detectedProvider);
+  const finalChoice = normalized.authChoice || detectedChoice;
+  const option = AUTH_LOOKUP[finalChoice];
+
+  return {
+    authChoice: finalChoice,
+    provider: option?.label || normalized.provider || detectedProvider || '',
+    providerId: detectedProvider || option?.providerId || normalized.providerId,
+    values: normalized.values,
+    apiKey: normalized.apiKey,
+  };
+};
+
+const mapOfficialChannelsToDrafts = (
+  officialChannels: Record<string, Record<string, unknown>> | undefined,
+  fallbackChannels: Record<string, boolean | ChannelSetupDraft> | undefined,
+): ChannelDraftMap => {
+  const fallbackMap = normalizeChannels(fallbackChannels);
+  const mapped = {} as ChannelDraftMap;
+
+  for (const channelId of SUPPORTED_CHANNELS) {
+    const channelConfig = officialChannels?.[channelId];
+    const fallback = fallbackMap.get(channelId) || { enabled: false, values: {} };
+    const definition = CHANNEL_LOOKUP[channelId];
+    const values: Record<string, string> = { ...(fallback.values || {}) };
+
+    if (definition) {
+      for (const field of definition.fields) {
+        const configValue = getValueByPath(channelConfig, field.configPath || field.id);
+        if (configValue === undefined || configValue === null) continue;
+        if (Array.isArray(configValue)) {
+          values[field.id] = configValue.join('\n');
+        } else {
+          values[field.id] = String(configValue);
+        }
+      }
+    }
+
+    mapped[channelId] = {
+      enabled: Boolean(channelConfig?.enabled ?? fallback.enabled),
+      values,
+    };
+  }
+
+  return mapped;
+};
+
+const applyOfficialOnboard = async (setup: AISetup, workspace: string, envOverrides?: NodeJS.ProcessEnv) => {
+  const { args } = buildOnboardArgs(setup, workspace);
+  await execCommand('openclaw', args, 30000, envOverrides);
+};
+
+const probeOfficialAuth = async (setup: AISetup) => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'clawone-probe-'));
+  const envOverrides = getProbeEnv(tempDir);
+  await fs.mkdir(envOverrides.OPENCLAW_STATE_DIR as string, { recursive: true });
+
+  try {
+    const workspace = path.join(tempDir, 'workspace');
+    const { option } = buildOnboardArgs(setup, workspace);
+    await applyOfficialOnboard(setup, workspace, envOverrides);
+
+    if (option.probeMode === 'stage-only' || !option.probeProvider) {
+      return {
+        success: true,
+        message: 'Credentials were accepted by official onboarding.',
+        details: 'This auth method does not expose a stable live probe in ClawOne yet.',
+      };
+    }
+
+    const { stdout } = await execCommand(
+      'openclaw',
+      ['models', 'status', '--json', '--probe', '--probe-provider', option.probeProvider],
+      30000,
+      envOverrides,
+    );
+    const status = parseJsonOutput<ModelStatus>(stdout, {});
+    const result = status.auth?.probes?.results?.find((entry) => entry.provider === option.probeProvider);
+    if (!result) {
+      return {
+        success: true,
+        message: 'Official onboarding completed, but the probe did not return a provider result.',
+      };
+    }
+
+    return {
+      success: result.status === 'ok',
+      message: result.status === 'ok'
+        ? `Official provider probe succeeded${result.latencyMs ? ` (${result.latencyMs} ms)` : ''}.`
+        : `Official provider probe returned "${result.status}".`,
+      details: result.error,
+    };
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+};
+
+const tryUnsetConfigPath = async (dotPath: string) => {
+  try {
+    await execCommand('openclaw', ['config', 'unset', dotPath]);
+  } catch {}
 };
 
 const isGatewayInstalled = (output: string) => {
@@ -543,29 +829,66 @@ const applyChannelDraft = async (channelId: (typeof SUPPORTED_CHANNELS)[number],
   await execCommand('openclaw', ['config', 'set', `channels.${channelId}`, '{}']);
 
   const cliFlags = CHANNEL_ADD_FLAGS[channelId];
-  if (!cliFlags) return;
+  if (cliFlags) {
+    const args = ['channels', 'add', '--channel', channelId];
+    let hasSetupValues = false;
 
-  const args = ['channels', 'add', '--channel', channelId];
-  let hasSetupValues = false;
+    for (const [fieldId, flag] of Object.entries(cliFlags)) {
+      const value = draft.values?.[fieldId]?.trim();
+      if (!value) continue;
+      args.push(flag, value);
+      hasSetupValues = true;
+    }
 
-  for (const [fieldId, flag] of Object.entries(cliFlags)) {
-    const value = draft.values?.[fieldId]?.trim();
-    if (!value) continue;
-    args.push(flag, value);
-    hasSetupValues = true;
+    if (hasSetupValues) {
+      await execCommand('openclaw', args, 30000);
+    }
   }
 
-  if (hasSetupValues) {
-    await execCommand('openclaw', args, 30000);
+  await execCommand('openclaw', ['config', 'set', `channels.${channelId}.enabled`, 'true']);
+
+  const definition = CHANNEL_LOOKUP[channelId];
+  for (const field of definition?.fields || []) {
+    if (!field.configPath) continue;
+    const rawValue = draft.values?.[field.id]?.trim() || '';
+    const dotPath = `channels.${channelId}.${field.configPath}`;
+    if (!rawValue) {
+      await tryUnsetConfigPath(dotPath);
+      continue;
+    }
+
+    await execCommand('openclaw', ['config', 'set', dotPath, serializeFieldValue(field.configPath, rawValue)]);
   }
 };
 
 // Read config
 ipcMain.handle('read-config', async () => {
   try {
-    const data = await fs.readFile(getUiConfigPath(), 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
+    let uiSnapshot: Partial<{ ai: Partial<AISetup>; workspace: string; channels: Record<string, boolean | ChannelSetupDraft> }> | null = null;
+    try {
+      const data = await fs.readFile(getUiConfigPath(), 'utf-8');
+      uiSnapshot = JSON.parse(data);
+    } catch {}
+
+    const [workspace, officialChannels, modelStatus] = await Promise.all([
+      getOfficialWorkspace().catch(() => uiSnapshot?.workspace || '~/.openclaw/workspace'),
+      getOfficialChannels().catch(() => ({})),
+      getOfficialModelStatus().catch(() => ({})),
+    ]);
+
+    const ai = mergeAiSetupWithOfficial(uiSnapshot?.ai, modelStatus);
+    const channels = mapOfficialChannelsToDrafts(officialChannels, uiSnapshot?.channels);
+
+    if (!uiSnapshot && !ai.authChoice && Object.keys(officialChannels).length === 0 && !workspace) {
+      return null;
+    }
+
+    return {
+      ai,
+      workspace,
+      channels,
+    };
+  } catch {
     return null;
   }
 });
@@ -576,16 +899,23 @@ ipcMain.handle('write-config', async (_, config: any) => {
     // Persist UI snapshot for ClawOne display/reload.
     const configDir = path.dirname(getConfigPath());
     await fs.mkdir(configDir, { recursive: true });
-    await fs.writeFile(getUiConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
+    const normalizedAi = normalizeAiSetup(config?.ai);
+    const normalizedConfig = {
+      ai: normalizedAi,
+      workspace: typeof config?.workspace === 'string' ? config.workspace : '~/.openclaw/workspace',
+      channels: config?.channels || {},
+    };
+    await fs.writeFile(getUiConfigPath(), JSON.stringify(normalizedConfig, null, 2), 'utf-8');
 
-    const workspace = typeof config?.workspace === 'string' ? config.workspace : '~/.openclaw/workspace';
-    await bootstrapValidConfig(workspace);
+    const workspace = normalizedConfig.workspace;
+    await backupInvalidConfigIfPresent();
+    await applyOfficialOnboard(normalizedAi, workspace);
 
     await execCommand('openclaw', ['config', 'set', 'gateway.mode', JSON.stringify('local')]);
     await execCommand('openclaw', ['config', 'set', 'gateway.bind', JSON.stringify('loopback')]);
     await execCommand('openclaw', ['config', 'set', 'agents.defaults.workspace', JSON.stringify(workspace)]);
 
-    const selectedChannels = normalizeChannels(config?.channels || {});
+    const selectedChannels = normalizeChannels(normalizedConfig.channels || {});
     for (const channelId of SUPPORTED_CHANNELS) {
       await applyChannelDraft(channelId, selectedChannels.get(channelId) || { enabled: false, values: {} });
     }
@@ -598,13 +928,21 @@ ipcMain.handle('write-config', async (_, config: any) => {
   }
 });
 
+ipcMain.handle('get-auth-options', async () => {
+  return getOfficialAuthOptions();
+});
+
 // Test API connection
-ipcMain.handle('test-api-connection', async (_, provider: string, apiKey: string) => {
-  // Simplified test - in production, you'd make actual API calls
-  if (!apiKey || apiKey.length < 10) {
-    return { success: false, message: 'Invalid API key' };
+ipcMain.handle('test-api-connection', async (_, setup: Partial<AISetup>) => {
+  try {
+    return await probeOfficialAuth(normalizeAiSetup(setup));
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Official auth probe failed.',
+      details: (error as Error).message,
+    };
   }
-  return { success: true, message: 'Connection successful' };
 });
 
 // Start OpenClaw service
@@ -685,81 +1023,118 @@ ipcMain.handle('install-update', () => {
   autoUpdater.quitAndInstall(false, true);
 });
 
-// Plugin management IPC handlers
-ipcMain.handle('install-plugin', async (event, pluginId: string) => {
-  const npmPath = await findCommandWithWhich('npm').catch(() => null) || 'npm';
-  const env = getShellEnv();
-  try {
-    const loginPath = await getLoginShellPath();
-    if (loginPath) env.PATH = loginPath;
-  } catch {}
+const PLUGIN_VISUALS: Record<string, Pick<Plugin, 'icon' | 'category'>> = {
+  whatsapp: { icon: '💬', category: 'messaging' },
+  telegram: { icon: '✈️', category: 'messaging' },
+  discord: { icon: '🎮', category: 'messaging' },
+  slack: { icon: '💼', category: 'messaging' },
+  googlechat: { icon: '🗨️', category: 'messaging' },
+  signal: { icon: '🔒', category: 'messaging' },
+  imessage: { icon: '💭', category: 'messaging' },
+  feishu: { icon: '🪶', category: 'messaging' },
+  msteams: { icon: '🟦', category: 'messaging' },
+  mattermost: { icon: '🏁', category: 'messaging' },
+  'nextcloud-talk': { icon: '☁️', category: 'messaging' },
+  matrix: { icon: '🧩', category: 'messaging' },
+  bluebubbles: { icon: '🔵', category: 'messaging' },
+  line: { icon: '📗', category: 'messaging' },
+  zalo: { icon: '📨', category: 'messaging' },
+  zalouser: { icon: '👤', category: 'messaging' },
+  'synology-chat': { icon: '🗂️', category: 'messaging' },
+  tlon: { icon: '🌊', category: 'messaging' },
+  'copilot-proxy': { icon: '🤖', category: 'integration' },
+  'google-gemini-cli-auth': { icon: '🧠', category: 'integration' },
+  acpx: { icon: '🦀', category: 'utility' },
+  memory: { icon: '🧠', category: 'utility' },
+};
 
-  return new Promise((resolve) => {
-    const proc = spawnCommand(npmPath, ['install', '-g', `@openclaw/plugin-${pluginId}@latest`], env);
+const getPlugins = async (): Promise<Plugin[]> => {
+  const { stdout } = await execCommand('openclaw', ['plugins', 'list', '--json'], 30000);
+  const payload = parseJsonOutput<{ plugins?: Array<Record<string, unknown>> }>(stdout, {});
+  return (payload.plugins || [])
+    .map((plugin) => {
+      const id = String(plugin.id || '');
+      const visuals = PLUGIN_VISUALS[id] || { icon: '🔌', category: 'utility' as const };
+      const origin = String(plugin.origin || '');
+      return {
+        id,
+        name: String(plugin.name || id),
+        description: String(plugin.description || ''),
+        icon: visuals.icon,
+        category: visuals.category,
+        installed: true,
+        enabled: Boolean(plugin.enabled),
+        version: typeof plugin.version === 'string' ? plugin.version : undefined,
+        origin,
+        status: typeof plugin.status === 'string' ? plugin.status : undefined,
+        source: typeof plugin.source === 'string' ? plugin.source : undefined,
+        packageSpec: origin === 'bundled' ? undefined : typeof plugin.name === 'string' ? String(plugin.name) : undefined,
+      } satisfies Plugin;
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+};
 
-    proc.stdout?.on('data', (data) => {
-      event.sender.send('plugin-log', data.toString());
-    });
+const forwardPluginCommandOutput = (
+  event: Electron.IpcMainInvokeEvent,
+  command: string,
+  args: string[],
+  successMessage: string,
+  failurePrefix: string,
+) => new Promise<{ success: boolean; error?: string }>((resolve) => {
+  const proc = spawnCommand(command, args, getShellEnv());
 
-    proc.stderr?.on('data', (data) => {
-      event.sender.send('plugin-log', data.toString());
-    });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve({ success: true });
-      } else {
-        resolve({ success: false, error: `Installation failed with code ${code}` });
-      }
-    });
+  proc.stdout?.on('data', (data) => {
+    event.sender.send('plugin-log', data.toString());
   });
+
+  proc.stderr?.on('data', (data) => {
+    event.sender.send('plugin-log', data.toString());
+  });
+
+  proc.on('close', (code) => {
+    if (code === 0) {
+      event.sender.send('plugin-log', successMessage);
+      resolve({ success: true });
+      return;
+    }
+    resolve({ success: false, error: `${failurePrefix} (exit ${code})` });
+  });
+});
+
+// Plugin management IPC handlers
+ipcMain.handle('get-plugins', async () => {
+  try {
+    return await getPlugins();
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('install-plugin', async (event, spec: string) => {
+  return forwardPluginCommandOutput(
+    event,
+    'openclaw',
+    ['plugins', 'install', spec],
+    `Installed plugin ${spec}.`,
+    `Installation failed for ${spec}`,
+  );
 });
 
 ipcMain.handle('uninstall-plugin', async (event, pluginId: string) => {
-  const npmPath = await findCommandWithWhich('npm').catch(() => null) || 'npm';
-  const env = getShellEnv();
-  try {
-    const loginPath = await getLoginShellPath();
-    if (loginPath) env.PATH = loginPath;
-  } catch {}
-
-  return new Promise((resolve) => {
-    const proc = spawnCommand(npmPath, ['uninstall', '-g', `@openclaw/plugin-${pluginId}`], env);
-
-    proc.stdout?.on('data', (data) => {
-      event.sender.send('plugin-log', data.toString());
-    });
-
-    proc.stderr?.on('data', (data) => {
-      event.sender.send('plugin-log', data.toString());
-    });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve({ success: true });
-      } else {
-        resolve({ success: false, error: `Uninstallation failed with code ${code}` });
-      }
-    });
-  });
+  return forwardPluginCommandOutput(
+    event,
+    'openclaw',
+    ['plugins', 'uninstall', pluginId, '--force'],
+    `Uninstalled plugin ${pluginId}.`,
+    `Uninstallation failed for ${pluginId}`,
+  );
 });
 
-ipcMain.handle('get-installed-plugins', async () => {
+ipcMain.handle('set-plugin-enabled', async (_, pluginId: string, enabled: boolean) => {
   try {
-    const { stdout } = await execCommand('npm', ['list', '-g', '--depth=0']);
-    const plugins: string[] = [];
-
-    // Parse npm list output to find installed @openclaw/plugin-* packages
-    const lines = stdout.split('\n');
-    for (const line of lines) {
-      const match = line.match(/@openclaw\/plugin-([a-z0-9-]+)/i);
-      if (match) {
-        plugins.push(match[1]);
-      }
-    }
-
-    return plugins;
+    await execCommand('openclaw', ['plugins', enabled ? 'enable' : 'disable', pluginId], 30000);
+    return { success: true };
   } catch (error) {
-    return [];
+    return { success: false, error: (error as Error).message };
   }
 });

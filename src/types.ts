@@ -7,7 +7,8 @@ export interface ElectronAPI {
   onInstallLog: (callback: (log: string) => void) => void;
   readConfig: () => Promise<OpenClawConfig | null>;
   writeConfig: (config: OpenClawConfig) => Promise<{ success: boolean; error?: string }>;
-  testApiConnection: (provider: string, apiKey: string) => Promise<{ success: boolean; message: string }>;
+  getAuthOptions: () => Promise<AuthOptionDefinition[]>;
+  testApiConnection: (config: AISetup) => Promise<{ success: boolean; message: string; details?: string }>;
   startOpenClaw: () => Promise<{ success: boolean }>;
   stopOpenClaw: () => Promise<{ success: boolean; error?: string }>;
   getServiceStatus: () => Promise<{ running: boolean; output: string }>;
@@ -21,9 +22,10 @@ export interface ElectronAPI {
   onUpdateError: (callback: (error: string) => void) => void;
   onUpdateDownloadProgress: (callback: (progress: any) => void) => void;
   onUpdateDownloaded: (callback: (info: any) => void) => void;
-  installPlugin: (pluginId: string) => Promise<{ success: boolean; error?: string }>;
+  getPlugins: () => Promise<Plugin[]>;
+  installPlugin: (spec: string) => Promise<{ success: boolean; error?: string }>;
   uninstallPlugin: (pluginId: string) => Promise<{ success: boolean; error?: string }>;
-  getInstalledPlugins: () => Promise<string[]>;
+  setPluginEnabled: (pluginId: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   onPluginLog: (callback: (log: string) => void) => void;
 }
 
@@ -39,10 +41,19 @@ export interface Plugin {
   description: string;
   icon: string;
   category: 'messaging' | 'integration' | 'utility';
-  packageName: string;
   installed: boolean;
   enabled: boolean;
   version?: string;
+  origin?: string;
+  status?: string;
+  source?: string;
+  packageSpec?: string;
+}
+
+export interface SelectOptionDefinition {
+  value: string;
+  label: string;
+  labelZh: string;
 }
 
 export interface ChannelFieldDefinition {
@@ -51,8 +62,13 @@ export interface ChannelFieldDefinition {
   labelZh: string;
   placeholder: string;
   cliFlag?: string;
+  configPath?: string;
   required?: boolean;
   secret?: boolean;
+  inputType?: 'text' | 'password' | 'textarea' | 'select';
+  options?: SelectOptionDefinition[];
+  help?: string;
+  helpZh?: string;
 }
 
 export interface ChannelDefinition {
@@ -77,20 +93,31 @@ export interface ChannelDraft {
 
 export type ChannelDraftMap = Record<string, ChannelDraft>;
 
+export interface AISetup {
+  authChoice: string;
+  provider: string;
+  providerId?: string;
+  values: Record<string, string>;
+  apiKey?: string;
+}
+
+export interface AuthOptionDefinition {
+  id: string;
+  label: string;
+  labelZh: string;
+  description: string;
+  descriptionZh: string;
+  providerId?: string;
+  fieldFlagMap: Record<string, string>;
+  fields: ChannelFieldDefinition[];
+  probeProvider?: string;
+  probeMode?: 'probe' | 'stage-only';
+}
+
 export interface OpenClawConfig {
-  ai: {
-    provider: string;
-    apiKey: string;
-    model?: string;
-  };
+  ai: AISetup;
   workspace: string;
   channels?: ChannelDraftMap;
-  plugins?: {
-    [key: string]: {
-      enabled: boolean;
-      config?: unknown;
-    };
-  };
 }
 
 export type Page =

@@ -7,7 +7,12 @@ const field = (
   placeholder: string,
   cliFlag?: string,
   required: boolean = false,
-  secret: boolean = false
+  secret: boolean = false,
+  inputType: ChannelDefinition['fields'][number]['inputType'] = 'text',
+  options?: ChannelDefinition['fields'][number]['options'],
+  configPath?: string,
+  help?: string,
+  helpZh?: string,
 ) => ({
   id,
   label,
@@ -16,7 +21,74 @@ const field = (
   cliFlag,
   required,
   secret,
+  inputType,
+  options,
+  configPath,
+  help,
+  helpZh,
 });
+
+const policyOptions = [
+  { value: 'allowlist', label: 'Allowlist', labelZh: '白名单' },
+  { value: 'open', label: 'Open', labelZh: '开放' },
+];
+
+const dmPolicyOptions = [
+  { value: 'pairing', label: 'Pairing', labelZh: '配对授权' },
+  { value: 'allowlist', label: 'Allowlist', labelZh: '白名单' },
+  { value: 'open', label: 'Open', labelZh: '开放' },
+];
+
+const allowlistField = (id: string, label: string, labelZh: string) => (
+  field(
+    id,
+    label,
+    labelZh,
+    'One ID per line or comma-separated',
+    undefined,
+    false,
+    false,
+    'textarea',
+    undefined,
+    id,
+    'Provide sender or group IDs, one per line.',
+    '每行一个 ID，也可以用逗号分隔。',
+  )
+);
+
+const groupPolicyField = () => (
+  field(
+    'groupPolicy',
+    'Group policy',
+    '群组策略',
+    '',
+    undefined,
+    false,
+    false,
+    'select',
+    policyOptions,
+    'groupPolicy',
+    'OpenClaw defaults many group-enabled channels to allowlist.',
+    'OpenClaw 对很多群组渠道默认使用白名单策略。',
+  )
+);
+
+const dmPolicyField = () => (
+  field(
+    'dmPolicy',
+    'DM policy',
+    '私聊策略',
+    '',
+    undefined,
+    false,
+    false,
+    'select',
+    dmPolicyOptions,
+    'dmPolicy',
+    'Use pairing to keep the default official safety gate for DMs.',
+    '使用 pairing 可以保持官方默认的私聊安全门槛。',
+  )
+);
 
 export const CHANNEL_CATALOG: ChannelDefinition[] = [
   {
@@ -29,7 +101,13 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
     summaryZh: '配置 Telegram Bot Token，让 OpenClaw 可以接收私聊和群消息。',
     docsUrl: 'https://docs.openclaw.ai/channels/telegram',
     commandMode: 'add',
-    fields: [field('token', 'Bot token', 'Bot Token', '123456:ABC...', '--token', true, true)],
+    fields: [
+      field('token', 'Bot token', 'Bot Token', '123456:ABC...', '--token', true, true),
+      dmPolicyField(),
+      allowlistField('allowFrom', 'DM allowlist', '私聊白名单'),
+      groupPolicyField(),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
+    ],
     steps: ['Create a bot with BotFather.', 'Paste the token below.', 'Save the draft, then let ClawOne write the channel config.'],
     stepsZh: ['先通过 BotFather 创建机器人。', '把 Bot Token 填到下方。', '保存后由 ClawOne 写入渠道配置。'],
   },
@@ -43,7 +121,12 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
     summaryZh: '先保存一个有效的渠道配置，再通过官方二维码流程绑定 WhatsApp Web 会话。',
     docsUrl: 'https://docs.openclaw.ai/channels/whatsapp',
     commandMode: 'login',
-    fields: [],
+    fields: [
+      dmPolicyField(),
+      allowlistField('allowFrom', 'DM allowlist', '私聊白名单'),
+      groupPolicyField(),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
+    ],
     steps: ['Save this channel.', 'Run the official login command shown below.', 'Scan the QR code or login link in the terminal.'],
     stepsZh: ['先保存当前渠道。', '运行下方官方登录命令。', '在终端里扫描二维码或打开登录链接。'],
   },
@@ -57,7 +140,12 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
     summaryZh: '配置 Discord Bot Token，并按官方网关格式保存渠道配置。',
     docsUrl: 'https://docs.openclaw.ai/channels/discord',
     commandMode: 'add',
-    fields: [field('token', 'Bot token', 'Bot Token', 'MTIzN...discord token...', '--token', true, true)],
+    fields: [
+      field('token', 'Bot token', 'Bot Token', 'MTIzN...discord token...', '--token', true, true),
+      groupPolicyField(),
+      allowlistField('allowFrom', 'Allowlist', '白名单'),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
+    ],
     steps: ['Create a Discord application and bot.', 'Paste the bot token below.', 'Invite the bot to your server after saving.'],
     stepsZh: ['先创建 Discord Application 和 Bot。', '把 Bot Token 填到下方。', '保存后再把 Bot 邀请进你的服务器。'],
   },
@@ -74,6 +162,9 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
     fields: [
       field('server', 'Server', '服务器', 'irc.libera.chat'),
       field('nick', 'Nickname', '昵称', 'clawone-bot'),
+      dmPolicyField(),
+      groupPolicyField(),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
     ],
     steps: ['Capture the IRC server and nickname here.', 'Open the docs page to finish the remaining config keys.', 'Save the channel stub so the channel appears in OpenClaw config.'],
     stepsZh: ['先记录 IRC 服务器与昵称。', '打开官方文档补齐剩余配置项。', '保存渠道占位，使其进入 OpenClaw 配置。'],
@@ -92,6 +183,9 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
       field('webhookUrl', 'Webhook URL', 'Webhook URL', 'https://chat.googleapis.com/...', '--webhook-url', true),
       field('audience', 'Audience', 'Audience', 'project number or app URL', '--audience'),
       field('audienceType', 'Audience type', 'Audience 类型', 'project-number', '--audience-type'),
+      groupPolicyField(),
+      allowlistField('allowFrom', 'Allowlist', '白名单'),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
     ],
     steps: ['Create the Chat app integration in Google Cloud.', 'Provide the webhook URL and audience information.', 'Save the draft to generate the matching CLI command.'],
     stepsZh: ['先在 Google Cloud 中创建 Chat 应用。', '填写 webhook URL 和 audience 信息。', '保存草稿后生成对应 CLI 配置命令。'],
@@ -109,6 +203,9 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
     fields: [
       field('appToken', 'App token', 'App Token', 'xapp-...', '--app-token', true, true),
       field('botToken', 'Bot token', 'Bot Token', 'xoxb-...', '--bot-token', true, true),
+      groupPolicyField(),
+      allowlistField('allowFrom', 'Allowlist', '白名单'),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
     ],
     steps: ['Enable Socket Mode in your Slack app.', 'Paste both Slack tokens below.', 'Save the channel draft and complete Slack app permissions in the docs if needed.'],
     stepsZh: ['先在 Slack App 中开启 Socket Mode。', '把两个 Slack Token 填到下方。', '保存后，如有需要再按文档补齐权限设置。'],
@@ -127,6 +224,10 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
       field('cliPath', 'CLI path', 'CLI 路径', '/usr/local/bin/signal-cli', '--cli-path'),
       field('httpUrl', 'HTTP URL', 'HTTP URL', 'http://127.0.0.1:8080', '--http-url'),
       field('signalNumber', 'Signal number', 'Signal 号码', '+15551234567', '--signal-number'),
+      dmPolicyField(),
+      allowlistField('allowFrom', 'DM allowlist', '私聊白名单'),
+      groupPolicyField(),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
     ],
     steps: ['Install signal-cli or prepare its HTTP bridge.', 'Fill the available runtime details below.', 'Follow the docs for account linking and verification.'],
     stepsZh: ['先安装 signal-cli 或准备 HTTP bridge。', '把你已有的运行参数填到下方。', '再按文档完成账号绑定和验证。'],
@@ -146,6 +247,9 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
       field('dbPath', 'Messages DB path', '消息数据库路径', '~/Library/Messages/chat.db', '--db-path'),
       field('service', 'Service', '服务类型', 'imessage', '--service'),
       field('region', 'Region', '地区', 'CN', '--region'),
+      dmPolicyField(),
+      groupPolicyField(),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
     ],
     steps: ['Install the iMessage bridge on macOS.', 'Provide the bridge and database paths.', 'Use the docs page if you need SMS fallback or account selection.'],
     stepsZh: ['先在 macOS 上安装 iMessage bridge。', '填写 bridge 路径和消息数据库路径。', '若需要 SMS 回退或账号选择，继续参考文档。'],
@@ -160,7 +264,11 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
     summaryZh: '飞书 / Lark 属于官方渠道列表。ClawOne 会保留有效渠道占位，并引导你进入官方配置指南。',
     docsUrl: 'https://docs.openclaw.ai/channels/feishu',
     commandMode: 'manual',
-    fields: [],
+    fields: [
+      dmPolicyField(),
+      groupPolicyField(),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
+    ],
     steps: ['Enable the channel in ClawOne.', 'Open the official docs page to finish app credentials and callbacks.', 'Save the draft so the channel is present in OpenClaw config.'],
     stepsZh: ['先在 ClawOne 里启用这个渠道。', '打开官方文档补齐应用凭证与回调。', '保存后该渠道会出现在 OpenClaw 配置中。'],
   },
@@ -188,7 +296,11 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
     summaryZh: 'Microsoft Teams 在 OpenClaw 中由扩展实现。ClawOne 会保留该渠道，并指向官方插件路径。',
     docsUrl: 'https://docs.openclaw.ai/channels/msteams',
     commandMode: 'plugin',
-    fields: [],
+    fields: [
+      dmPolicyField(),
+      groupPolicyField(),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
+    ],
     steps: ['Enable the Teams channel stub here.', 'Install the official Teams extension/plugin as documented.', 'Finish Bot Framework credentials in the docs page.'],
     stepsZh: ['先启用 Teams 渠道占位。', '按文档安装官方 Teams 扩展或插件。', '随后在文档页完成 Bot Framework 凭证配置。'],
   },
@@ -236,6 +348,8 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
       field('accessToken', 'Access token', 'Access Token', 'syt_...', '--access-token', false, true),
       field('password', 'Password', '密码', 'optional if no access token', '--password', false, true),
       field('deviceName', 'Device name', '设备名', 'ClawOne', '--device-name'),
+      allowlistField('allowFrom', 'Allowlist', '白名单'),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
     ],
     steps: ['Provide your Matrix homeserver and account identity.', 'Use either an access token or password.', 'Save the draft to generate the matching channel add command.'],
     stepsZh: ['填写 Matrix homeserver 和账号信息。', '可使用 access token 或 password。', '保存草稿后生成对应的 channel add 命令。'],
@@ -250,7 +364,13 @@ export const CHANNEL_CATALOG: ChannelDefinition[] = [
     summaryZh: 'BlueBubbles 依赖其 macOS bridge 和 webhook path 细节。',
     docsUrl: 'https://docs.openclaw.ai/channels/bluebubbles',
     commandMode: 'add',
-    fields: [field('webhookPath', 'Webhook path', 'Webhook 路径', '/bluebubbles/webhook', '--webhook-path')],
+    fields: [
+      field('webhookPath', 'Webhook path', 'Webhook 路径', '/bluebubbles/webhook', '--webhook-path'),
+      dmPolicyField(),
+      allowlistField('allowFrom', 'DM allowlist', '私聊白名单'),
+      groupPolicyField(),
+      allowlistField('groupAllowFrom', 'Group allowlist', '群组白名单'),
+    ],
     steps: ['Install and pair the BlueBubbles app first.', 'Store the webhook path in this draft.', 'Use the docs page if you need the full bridge setup.'],
     stepsZh: ['先安装并绑定 BlueBubbles 应用。', '把 webhook path 记录在这里。', '若需完整 bridge 配置，继续参考官方文档。'],
   },

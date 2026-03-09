@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Page, OpenClawConfig } from './types';
+import { AuthOptionDefinition, Page, OpenClawConfig } from './types';
 import Welcome from './pages/Welcome';
 import Environment from './pages/Environment';
 import Install from './pages/Install';
@@ -28,11 +28,13 @@ function App() {
   const { i18n, t } = useTranslation();
   const [currentPage, setCurrentPage] = useState<Page>('welcome');
   const [availablePages, setAvailablePages] = useState<Page[]>(['welcome']);
+  const [authOptions, setAuthOptions] = useState<AuthOptionDefinition[]>([]);
   const [config, setConfig] = useState<Partial<OpenClawConfig>>({
     workspace: '~/.openclaw/workspace'
   });
 
   useEffect(() => {
+    window.electronAPI.getAuthOptions().then(setAuthOptions).catch(() => undefined);
     window.electronAPI.readConfig().then((savedConfig) => {
       if (!savedConfig) return;
       setConfig(savedConfig);
@@ -82,6 +84,7 @@ function App() {
       case 'config-step1':
         return (
           <ConfigStep1
+            authOptions={authOptions}
             config={config}
             updateConfig={updateConfig}
             onNext={() => navigateTo('config-step2')}
@@ -90,6 +93,7 @@ function App() {
       case 'config-step2':
         return (
           <ConfigStep2
+            authOptions={authOptions}
             config={config}
             updateConfig={updateConfig}
             onNext={() => navigateTo('config-step3')}

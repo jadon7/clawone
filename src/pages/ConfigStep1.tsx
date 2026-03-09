@@ -1,35 +1,34 @@
 import { useTranslation } from 'react-i18next';
-import { OpenClawConfig } from '../types';
+import { AuthOptionDefinition, OpenClawConfig } from '../types';
 
 interface ConfigStep1Props {
+  authOptions: AuthOptionDefinition[];
   config: Partial<OpenClawConfig>;
   updateConfig: (updates: Partial<OpenClawConfig>) => void;
   onNext: () => void;
 }
 
-export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep1Props) {
-  const { t } = useTranslation();
-  const providers = [
-    'openai', 'anthropic', 'chutes', 'vllm', 'minimax', 'moonshot',
-    'google', 'xai', 'mistral', 'volcengine', 'byteplus', 'openrouter',
-    'kilo', 'qwen', 'zai', 'qianfan', 'copilot', 'vercel', 'opencode-zen',
-    'xiaomi', 'synthetic', 'together', 'huggingface', 'venice', 'litellm',
-    'cloudflare', 'custom'
-  ];
+export default function ConfigStep1({ authOptions, config, updateConfig, onNext }: ConfigStep1Props) {
+  const { t, i18n } = useTranslation();
 
-  const handleProviderChange = (provider: string) => {
+  const handleProviderChange = (authChoice: string) => {
+    const option = authOptions.find((item) => item.id === authChoice);
     updateConfig({
       ai: {
-        ...config.ai,
-        provider,
-        apiKey: config.ai?.apiKey || ''
+        authChoice,
+        provider: i18n.language.startsWith('zh') ? option?.labelZh || authChoice : option?.label || authChoice,
+        providerId: option?.providerId,
+        values: {},
+        apiKey: '',
       }
     });
   };
 
   const canContinue = () => {
-    return config.ai?.provider;
+    return Boolean(config.ai?.authChoice);
   };
+
+  const selectedOption = authOptions.find((item) => item.id === config.ai?.authChoice);
 
   return (
     <div className="page">
@@ -47,17 +46,36 @@ export default function ConfigStep1({ config, updateConfig, onNext }: ConfigStep
         <label className="form-label">{t('config.step1.aiProvider')}</label>
         <select
           className="form-select"
-          value={config.ai?.provider || ''}
+          value={config.ai?.authChoice || ''}
           onChange={(e) => handleProviderChange(e.target.value)}
         >
           <option value="">{t('config.step1.selectProvider')}</option>
-          {providers.map((provider) => (
-            <option key={provider} value={provider}>
-              {t(`config.step1.providers.${provider}`)}
+          {authOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {i18n.language.startsWith('zh') ? option.labelZh : option.label}
             </option>
           ))}
         </select>
       </div>
+
+      {selectedOption && (
+        <div
+          style={{
+            background: '#f7fafc',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '24px'
+          }}
+        >
+          <strong style={{ color: '#2d3748' }}>
+            {i18n.language.startsWith('zh') ? selectedOption.labelZh : selectedOption.label}
+          </strong>
+          <p style={{ color: '#4a5568', marginTop: '8px', marginBottom: '0' }}>
+            {i18n.language.startsWith('zh') ? selectedOption.descriptionZh : selectedOption.description}
+          </p>
+        </div>
+      )}
 
       <div className="button-group">
         <button

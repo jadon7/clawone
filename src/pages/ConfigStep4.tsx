@@ -52,7 +52,10 @@ export default function ConfigStep4({ config, updateConfig, onNext, onBack }: Co
     updateConfig({ channels });
 
     try {
-      await window.electronAPI.writeConfig(finalConfig);
+      const result = await window.electronAPI.writeConfig(finalConfig);
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown save error');
+      }
       onNext();
     } catch (error) {
       alert('Failed to save configuration: ' + (error as Error).message);
@@ -74,6 +77,9 @@ export default function ConfigStep4({ config, updateConfig, onNext, onBack }: Co
   const setupLabel = i18n.language.startsWith('zh') ? selectedChannel.setupLabelZh : selectedChannel.setupLabel;
   const commandPreview = buildChannelCommand(selectedChannel, selectedDraft);
   const enabledCount = Object.values(channels).filter((draft) => draft.enabled).length;
+  const groupPolicy = selectedDraft?.values.groupPolicy || '';
+  const groupAllowFrom = selectedDraft?.values.groupAllowFrom || '';
+  const needsGroupAllowlistWarning = selectedDraft?.enabled && groupPolicy === 'allowlist' && !groupAllowFrom.trim();
 
   return (
     <div className="page">
@@ -154,15 +160,59 @@ export default function ConfigStep4({ config, updateConfig, onNext, onBack }: Co
                   <label className="form-label">
                     {i18n.language.startsWith('zh') ? field.labelZh : field.label}
                   </label>
-                  <input
-                    type={field.secret ? 'password' : 'text'}
-                    className="form-input"
-                    value={selectedDraft?.values[field.id] || ''}
-                    onChange={(event) => updateField(selectedChannel.id, field.id, event.target.value)}
-                    placeholder={field.placeholder}
-                  />
+                  {field.inputType === 'select' ? (
+                    <select
+                      className="form-select"
+                      value={selectedDraft?.values[field.id] || field.options?.[0]?.value || ''}
+                      onChange={(event) => updateField(selectedChannel.id, field.id, event.target.value)}
+                    >
+                      {(field.options || []).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {i18n.language.startsWith('zh') ? option.labelZh : option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.inputType === 'textarea' ? (
+                    <textarea
+                      className="form-input"
+                      rows={4}
+                      value={selectedDraft?.values[field.id] || ''}
+                      onChange={(event) => updateField(selectedChannel.id, field.id, event.target.value)}
+                      placeholder={field.placeholder}
+                    />
+                  ) : (
+                    <input
+                      type={field.secret ? 'password' : 'text'}
+                      className="form-input"
+                      value={selectedDraft?.values[field.id] || ''}
+                      onChange={(event) => updateField(selectedChannel.id, field.id, event.target.value)}
+                      placeholder={field.placeholder}
+                    />
+                  )}
+                  {(field.help || field.helpZh) && (
+                    <p style={{ fontSize: '14px', color: '#718096', marginTop: '8px', marginBottom: '0' }}>
+                      {i18n.language.startsWith('zh') ? field.helpZh : field.help}
+                    </p>
+                  )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {needsGroupAllowlistWarning && (
+            <div
+              style={{
+                background: '#fffaf0',
+                border: '2px solid #f6ad55',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '24px'
+              }}
+            >
+              <strong style={{ color: '#7c2d12' }}>{t('config.step4.groupWarningTitle')}</strong>
+              <p style={{ color: '#744210', marginTop: '8px', marginBottom: '0' }}>
+                {t('config.step4.groupWarningBody')}
+              </p>
             </div>
           )}
 

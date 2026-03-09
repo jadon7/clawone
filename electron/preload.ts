@@ -18,8 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Configuration
   readConfig: () => ipcRenderer.invoke('read-config'),
   writeConfig: (config: any) => ipcRenderer.invoke('write-config', config),
-  testApiConnection: (provider: string, apiKey: string) =>
-    ipcRenderer.invoke('test-api-connection', provider, apiKey),
+  getAuthOptions: () => ipcRenderer.invoke('get-auth-options'),
+  testApiConnection: (config: any) =>
+    ipcRenderer.invoke('test-api-connection', config),
 
   // Service management
   startOpenClaw: () => ipcRenderer.invoke('start-openclaw'),
@@ -53,9 +54,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Plugin management
-  installPlugin: (pluginId: string) => ipcRenderer.invoke('install-plugin', pluginId),
+  getPlugins: () => ipcRenderer.invoke('get-plugins'),
+  installPlugin: (spec: string) => ipcRenderer.invoke('install-plugin', spec),
   uninstallPlugin: (pluginId: string) => ipcRenderer.invoke('uninstall-plugin', pluginId),
-  getInstalledPlugins: () => ipcRenderer.invoke('get-installed-plugins'),
+  setPluginEnabled: (pluginId: string, enabled: boolean) => ipcRenderer.invoke('set-plugin-enabled', pluginId, enabled),
   onPluginLog: (callback: (log: string) => void) => {
     ipcRenderer.on('plugin-log', (_, log) => callback(log));
   }

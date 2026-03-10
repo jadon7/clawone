@@ -848,6 +848,28 @@ const isGatewayRunning = (output: string) => {
   );
 };
 
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const waitForGatewayRunning = async (
+  event: Electron.IpcMainInvokeEvent,
+  attempts: number,
+  intervalMs: number,
+) => {
+  let lastOutput = '';
+  for (let i = 0; i < attempts; i += 1) {
+    const status = await execCommand('openclaw', ['gateway', 'status'], 30000);
+    lastOutput = status.stdout;
+    emitCommandOutput(event, status.stdout);
+    if (isGatewayRunning(status.stdout)) {
+      return { running: true, output: status.stdout };
+    }
+    if (i < attempts - 1) {
+      await sleep(intervalMs);
+    }
+  }
+  return { running: false, output: lastOutput };
+};
+
 const emitCommandOutput = (event: Electron.IpcMainInvokeEvent, output: string) => {
   output
     .split('\n')
@@ -1088,20 +1110,31 @@ ipcMain.handle('start-openclaw', async (event) => {
     emitCommandOutput(event, startResult.stdout);
     emitCommandOutput(event, startResult.stderr);
 
-    const statusAfter = await execCommand('openclaw', ['gateway', 'status'], 30000);
-    emitCommandOutput(event, statusAfter.stdout);
+    let statusAfter = await waitForGatewayRunning(event, 6, 1500);
 
-    if (!isGatewayRunning(statusAfter.stdout)) {
+    if (!statusAfter.running) {
       await tryRecoverMacLaunchAgent(event).catch((error) => {
         event.sender.send('service-log', `launchctl recovery skipped: ${(error as Error).message}`);
       });
       const retryStart = await execCommand('openclaw', ['gateway', 'start'], 30000);
       emitCommandOutput(event, retryStart.stdout);
       emitCommandOutput(event, retryStart.stderr);
-      const retryStatus = await execCommand('openclaw', ['gateway', 'status'], 30000);
-      emitCommandOutput(event, retryStatus.stdout);
+      statusAfter = await waitForGatewayRunning(event, 6, 1500);
 
-      if (!isGatewayRunning(retryStatus.stdout)) {
+      if (!statusAfter.running) {
+        event.sender.send('service-log', 'Gateway still not running. Reinstalling gateway service and retrying...');
+        await execCommand('openclaw', ['gateway', 'stop'], 30000).catch(() => undefined);
+        await execCommand('openclaw', ['gateway', 'uninstall'], 30000).catch(() => undefined);
+        const reinstall = await execCommand('openclaw', ['gateway', 'install'], 30000);
+        emitCommandOutput(event, reinstall.stdout);
+        emitCommandOutput(event, reinstall.stderr);
+        const restart = await execCommand('openclaw', ['gateway', 'start'], 30000);
+        emitCommandOutput(event, restart.stdout);
+        emitCommandOutput(event, restart.stderr);
+        statusAfter = await waitForGatewayRunning(event, 8, 1500);
+      }
+
+      if (!statusAfter.running) {
         throw new Error('Gateway service did not enter a running state. Check the logs above.');
       }
     }
